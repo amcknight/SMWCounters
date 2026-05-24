@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>LiveSplit</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <TargetFramework>net4.8.1</TargetFramework>
+
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(LsSrcPath)\LiveSplit.Core\LiveSplit.Core.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PolySharp" Version="1.14.1" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\death.png">
+      <LogicalName>LiveSplit.SmwCounters.Assets.death.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\moon.png">
+      <LogicalName>LiveSplit.SmwCounters.Assets.moon.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\exit.png">
+      <LogicalName>LiveSplit.SmwCounters.Assets.exit.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\jump.png">
+      <LogicalName>LiveSplit.SmwCounters.Assets.jump.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
