@@ -16,7 +16,7 @@ public class SmwCountersComponentSettings : UserControl
 {
     public CompositeHook Hook { get; }
 
-    private readonly HashSet<string> enabled = new();
+    private readonly HashSet<string> enabled = new() { "deaths", "exits" };
     private readonly Dictionary<string, string> labels = new();
 
     public KeyOrButton ResetKey { get; set; }
