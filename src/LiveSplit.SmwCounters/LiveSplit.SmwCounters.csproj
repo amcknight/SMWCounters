@@ -6,6 +6,9 @@
     <TargetFramework>net4.8.1</TargetFramework>
 
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Version>0.1.0</Version>
+    <Company>Andrew McKnight</Company>
+    <Product>LiveSplit SMW Counters</Product>
   </PropertyGroup>
 
   <PropertyGroup>
