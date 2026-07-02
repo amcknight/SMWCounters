@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for a manual build (e.g. v0.1.0-test)"
+        required: false
+        default: "v0.0.0-dev"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "${{ github.event.inputs.version }}" }
+          $clean = $v -replace '^v',''
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "versionClean=$clean" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Fetch LiveSplit.Core.dll
+        shell: pwsh
+        run: pwsh -File scripts/fetch-livesplit-core.ps1
+
+      - name: Build (Release)
+        run: dotnet build src/LiveSplit.SmwCounters/LiveSplit.SmwCounters.csproj -c Release -p:Version=${{ steps.ver.outputs.versionClean }}
+
+      - name: Stage release assets
+        id: stage
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Recurse -Filter LiveSplit.SmwCounters.dll artifacts | Select-Object -First 1
+          if (-not $dll) { throw "built DLL not found" }
+          $out = "release-staging"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item $dll.FullName    (Join-Path $out "LiveSplit.SmwCounters.dll")
+          Copy-Item "README.md"      $out
+          Copy-Item "LICENSE"        $out
+          Copy-Item "CREDITS.md"     $out
+          $zip = "LiveSplit.SmwCounters-${{ steps.ver.outputs.version }}.zip"
+          Compress-Archive -Path "$out/*" -DestinationPath $zip -Force
+          "dll=release-staging/LiveSplit.SmwCounters.dll" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "zip=$zip"             | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.ver.outputs.version }}
+          files: |
+            ${{ steps.stage.outputs.dll }}
+            ${{ steps.stage.outputs.zip }}
+
+      - name: Upload build artifacts (manual runs)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiveSplit.SmwCounters-${{ steps.ver.outputs.version }}
+          path: |
+            ${{ steps.stage.outputs.dll }}
+            ${{ steps.stage.outputs.zip }}
