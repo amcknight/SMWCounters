@@ -31,14 +31,16 @@ jobs:
         shell: pwsh
         run: |
           $v = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "${{ github.event.inputs.version }}" }
+          $clean = $v -replace '^v',''
           "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "versionClean=$clean" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Fetch LiveSplit.Core.dll
         shell: pwsh
         run: pwsh -File scripts/fetch-livesplit-core.ps1
 
       - name: Build (Release)
-        run: dotnet build src/LiveSplit.SmwCounters/LiveSplit.SmwCounters.csproj -c Release
+        run: dotnet build src/LiveSplit.SmwCounters/LiveSplit.SmwCounters.csproj -c Release -p:Version=${{ steps.ver.outputs.versionClean }}
 
       - name: Stage release assets
         id: stage
@@ -54,7 +56,7 @@ jobs:
           Copy-Item "CREDITS.md"     $out
           $zip = "LiveSplit.SmwCounters-${{ steps.ver.outputs.version }}.zip"
           Compress-Archive -Path "$out/*" -DestinationPath $zip -Force
-          "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "dll=release-staging/LiveSplit.SmwCounters.dll" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "zip=$zip"             | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Publish GitHub Release
