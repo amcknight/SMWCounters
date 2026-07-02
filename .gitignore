@@ -1,0 +1,17 @@
+# Build output
+artifacts/
+bin/
+obj/
+
+# Fetched third-party assemblies (see scripts/fetch-livesplit-core.ps1)
+lib/*.dll
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# OS noise
+Thumbs.db
+.DS_Store
