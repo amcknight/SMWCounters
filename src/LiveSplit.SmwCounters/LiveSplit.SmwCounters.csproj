@@ -8,8 +8,29 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
-  <ItemGroup>
+  <PropertyGroup>
+    <!-- LiveSplit release whose LiveSplit.Core.dll the standalone/CI build references.
+         Keep in sync with scripts/fetch-livesplit-core.ps1 and the release workflow. -->
+    <LiveSplitVersion>1.8.37</LiveSplitVersion>
+  </PropertyGroup>
+
+  <!-- Super-repo dev: build against LiveSplit source when the super-repo provides LsSrcPath. -->
+  <ItemGroup Condition="'$(LsSrcPath)' != ''">
     <ProjectReference Include="$(LsSrcPath)\LiveSplit.Core\LiveSplit.Core.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <!-- Standalone / CI: reference the prebuilt LiveSplit.Core.dll fetched into lib/. -->
+  <ItemGroup Condition="'$(LsSrcPath)' == ''">
+    <Reference Include="LiveSplit.Core">
+      <HintPath>$(MSBuildThisFileDirectory)..\..\lib\LiveSplit.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- LiveSplit.Core's public API (e.g. IComponent.Update) surfaces UpdateManager
+         types (IUpdateable) at compile time; fetched alongside LiveSplit.Core.dll. -->
+    <Reference Include="UpdateManager">
+      <HintPath>$(MSBuildThisFileDirectory)..\..\lib\UpdateManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
