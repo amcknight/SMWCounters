@@ -280,7 +280,8 @@ public class SmwCountersComponent : IComponent
             }
             x += labelW + 4;
 
-            ConfigureLabel(valueCells[c.Id], font, textColor, StringAlignment.Near, x, valueW, height);
+            Color valueColor = c.ValueIsAlert ? state.LayoutSettings.BehindLosingTimeColor : textColor;
+            ConfigureLabel(valueCells[c.Id], font, valueColor, StringAlignment.Near, x, valueW, height);
             valueCells[c.Id].Draw(g);
             x += valueW + CellGap;
         }

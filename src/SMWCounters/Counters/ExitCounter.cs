@@ -25,6 +25,8 @@ internal sealed class ExitCounter : ISmwCounter
 
     public int Value { get; private set; }
 
+    public bool ValueIsAlert => false;
+
     public void Reset()
     {
         Value = 0;
