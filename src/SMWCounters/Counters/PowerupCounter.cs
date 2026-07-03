@@ -10,7 +10,8 @@ namespace LiveSplit.SmwCounters.Counters;
 // completing an exit banks them. total shows in the alert color until banked.
 internal sealed class PowerupCounter : BankedCounter
 {
-    private const int LevelStartOffset = 0x1935;
+    private const int GameModeOffset = 0x0100;
+    private const byte LevelMainMode = 0x14;
     private const int PlayerAnimationOffset = 0x0071;
     private const int MidwayOffset = 0x13CE;
     private const int ExitsCompletedOffset = 0x1F2E;
@@ -29,7 +30,7 @@ internal sealed class PowerupCounter : BankedCounter
     protected override bool DetectCollect(ISnesMemory memory)
     {
         // Gate to in-level so overworld/load/garbage animation values don't count.
-        if (!memory.ReadWramByte(LevelStartOffset, out byte levelStart) || levelStart != 1)
+        if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
         {
             previousCollectAnim.Clear();
             return false;
