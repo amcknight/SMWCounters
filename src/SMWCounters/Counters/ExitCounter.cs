@@ -1,70 +1,58 @@
 using System.Drawing;
-using System.Xml;
 
 using LiveSplit.SmwCounters.Snes;
 using LiveSplit.UI;
 
 namespace LiveSplit.SmwCounters.Counters;
 
-internal sealed class ExitCounter : ISmwCounter
+// Collect on the exit event (exitMode $0DD5 shift to a valid exit type); bank
+// when the exit is written to the save file ($1F2E increments). After-goal
+// deaths revert the unbanked collect (base die-to-discard). Banking off $1F2E
+// (not counting off it) keeps the save-load 0->24 populate from phantom-counting.
+internal sealed class ExitCounter : BankedCounter
 {
-    // SNES WRAM $0DD5 (exitMode): the end-of-level exit type. It shifts to a
-    // non-zero, non-128 value exactly when a level exit is completed. Ported
-    // from kaizosplits Watchers.cs (ToExit => Shifted(exitMode) && curr != 0
-    // && curr != 128). Event-based, so loading a save (which populates the
-    // $1F2E ExitsCompleted byte) does not fire it — unlike the old $1F2E watch.
     private const int ExitModeOffset = 0x0DD5;
+    private const int ExitsCompletedOffset = 0x1F2E;
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.exit.png");
 
     private readonly PreviousByte previousExitMode = new();
+    private readonly PreviousByte previousExits = new();
 
-    public string Id => "exits";
-    public Image DefaultIcon => icon;
-    public string DefaultLabel => "Exits";
+    public override string Id => "exits";
+    public override Image DefaultIcon => icon;
+    public override string DefaultLabel => "Exits";
+    protected override string SaveName => "Exits";
 
-    public int Value { get; private set; }
-
-    public bool ValueIsAlert => false;
-
-    public void Reset()
+    protected override bool DetectCollect(ISnesMemory memory)
     {
-        Value = 0;
-        previousExitMode.Clear();
-    }
-
-    public void Poll(ISnesMemory memory)
-    {
-        if (!memory.IsAttached)
-        {
-            previousExitMode.Clear();
-            return;
-        }
-
         if (!memory.ReadWramByte(ExitModeOffset, out byte exitMode))
         {
             previousExitMode.Clear();
-            return;
+            return false;
         }
-
-        if (previousExitMode.HasPrevious
+        bool collected = previousExitMode.HasPrevious
             && exitMode != previousExitMode.Value
-            && exitMode != 0
-            && exitMode != 128)
-        {
-            Value++;
-        }
+            && exitMode != 0 && exitMode != 128;
         previousExitMode.Set(exitMode);
+        return collected;
     }
 
-    public void SaveState(XmlDocument doc, XmlElement parent)
+    protected override bool DetectBank(ISnesMemory memory)
     {
-        SettingsHelper.CreateSetting(doc, parent, "Exits", Value);
+        if (!memory.ReadWramByte(ExitsCompletedOffset, out byte exits))
+        {
+            previousExits.Clear();
+            return false;
+        }
+        bool banked = previousExits.HasPrevious && exits > previousExits.Value;
+        previousExits.Set(exits);
+        return banked;
     }
 
-    public void LoadState(XmlElement parent)
+    protected override void ClearDetectors()
     {
-        Value = SettingsHelper.ParseInt(parent["Exits"], 0);
         previousExitMode.Clear();
+        previousExits.Clear();
     }
 }
