@@ -33,7 +33,6 @@ public class SmwCountersComponentSettings : UserControl
     }
 
     private readonly List<CounterRow> rows = new();
-    private readonly ToolTip toolTip = new();
     private TextBox txtReset;
     private TrackBar trkHeight;
     private RadioButton rdoLeft;
@@ -92,7 +91,8 @@ public class SmwCountersComponentSettings : UserControl
             {
                 Text = getValue().ToString(),
                 Location = new Point(140, y),
-                Width = 45,
+                Width = 36,
+                TextAlign = HorizontalAlignment.Right,
             };
             row.ValueBox.Leave += (_, __) => CommitValue(row);
             row.ValueBox.KeyDown += (_, e) =>
@@ -100,7 +100,6 @@ public class SmwCountersComponentSettings : UserControl
                 if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; CommitValue(row); }
             };
             Controls.Add(row.ValueBox);
-            toolTip.SetToolTip(row.ValueBox, "This counter's current value. Type a number to set it (e.g. to continue a run).");
 
             row.ResetValue = new Button
             {
@@ -274,7 +273,6 @@ public class SmwCountersComponentSettings : UserControl
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { toolTip?.Dispose(); }
         base.Dispose(disposing);
     }
 

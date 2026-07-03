@@ -114,40 +114,17 @@ public class SmwCountersComponent : IComponent
     {
         if (counter is MoonCounter moon)
         {
-            var panel = new Panel { Width = 400, Height = 24, Padding = new Padding(0) };
-            var rdoAll = new RadioButton
+            var chk = new CheckBox
             {
-                Text = "All",
-                AutoSize = true,
-                Checked = moon.DedupeMode == MoonDedupeMode.All,
-                Location = new Point(0, 4),
-            };
-            var rdoLevel = new RadioButton
-            {
-                Text = "Per level",
+                Text = "One per level",
                 AutoSize = true,
                 Checked = moon.DedupeMode == MoonDedupeMode.PerLevel,
-                Location = new Point(48, 4),
+                Location = new Point(0, 4),
             };
-            var rdoRoom = new RadioButton
-            {
-                Text = "Per room",
-                AutoSize = true,
-                Checked = moon.DedupeMode == MoonDedupeMode.PerRoom,
-                Location = new Point(130, 4),
-            };
-            rdoAll.CheckedChanged   += (_, __) => { if (rdoAll.Checked)   { moon.DedupeMode = MoonDedupeMode.All; } };
-            rdoLevel.CheckedChanged += (_, __) => { if (rdoLevel.Checked) { moon.DedupeMode = MoonDedupeMode.PerLevel; } };
-            rdoRoom.CheckedChanged  += (_, __) => { if (rdoRoom.Checked)  { moon.DedupeMode = MoonDedupeMode.PerRoom; } };
-            panel.Controls.Add(rdoAll);
-            panel.Controls.Add(rdoLevel);
-            panel.Controls.Add(rdoRoom);
-            Action refresh = () =>
-            {
-                rdoAll.Checked = moon.DedupeMode == MoonDedupeMode.All;
-                rdoLevel.Checked = moon.DedupeMode == MoonDedupeMode.PerLevel;
-                rdoRoom.Checked = moon.DedupeMode == MoonDedupeMode.PerRoom;
-            };
+            chk.CheckedChanged += (_, __) => moon.DedupeMode = chk.Checked ? MoonDedupeMode.PerLevel : MoonDedupeMode.All;
+            var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
+            panel.Controls.Add(chk);
+            Action refresh = () => chk.Checked = moon.DedupeMode == MoonDedupeMode.PerLevel;
             return (panel, refresh);
         }
         if (counter is PowerupCounter)

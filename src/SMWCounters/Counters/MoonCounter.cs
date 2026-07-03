@@ -7,22 +7,21 @@ using LiveSplit.UI;
 
 namespace LiveSplit.SmwCounters.Counters;
 
-internal enum MoonDedupeMode { All, PerLevel, PerRoom }
+internal enum MoonDedupeMode { All, PerLevel }
 
 internal sealed class MoonCounter : ISmwCounter
 {
     // SNES WRAM addresses (from kaizosplits Memory.cs).
     private const int MoonCounterOffset = 0x13C5; // # of 3-up moons collected, per scene
     private const int LevelNumOffset    = 0x13BF; // translevel number
-    private const int RoomNumOffset     = 0x010B; // sublevel within current level
     private const int LevelStartOffset  = 0x1935; // in-level == 1 (kaizosplits InLevel)
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.moon.png");
 
     private readonly PreviousByte previousMoon = new();
 
-    // Keys (level, or level+room) where a moon has been counted this session.
-    // Only used in PerLevel / PerRoom modes.
+    // Levels where a moon has already been counted this session.
+    // Only used in PerLevel mode.
     private readonly HashSet<int> countedKeys = new();
 
     public string Id => "moons";
@@ -76,14 +75,12 @@ internal sealed class MoonCounter : ISmwCounter
             }
             else
             {
-                if (!memory.ReadWramByte(LevelNumOffset, out byte level)
-                    || !memory.ReadWramByte(RoomNumOffset, out byte room))
+                if (!memory.ReadWramByte(LevelNumOffset, out byte level))
                 {
                     previousMoon.Clear();
                     return;
                 }
-                int key = DedupeMode == MoonDedupeMode.PerRoom ? ((level << 8) | room) : level;
-                if (countedKeys.Add(key)) { Value++; }
+                if (countedKeys.Add(level)) { Value++; }
             }
         }
         previousMoon.Set(moon);
@@ -99,17 +96,24 @@ internal sealed class MoonCounter : ISmwCounter
     {
         Value = SettingsHelper.ParseInt(parent["Moons"], 0);
 
-        // Try new DedupeMode string first; fall back to legacy DedupePerRoom bool.
+        // Try new DedupeMode string first; fall back to legacy PerRoom / DedupePerRoom
+        // values so old layouts don't error out on load.
         XmlElement modeEl = parent["DedupeMode"];
         if (modeEl != null && System.Enum.TryParse(modeEl.InnerText, out MoonDedupeMode mode))
         {
             DedupeMode = mode;
         }
+        else if (modeEl != null && modeEl.InnerText == "PerRoom")
+        {
+            DedupeMode = MoonDedupeMode.PerLevel;   // Per Room dropped -> nearest
+        }
+        else if (SettingsHelper.ParseBool(parent["DedupePerRoom"], false))
+        {
+            DedupeMode = MoonDedupeMode.PerLevel;   // legacy bool
+        }
         else
         {
-            DedupeMode = SettingsHelper.ParseBool(parent["DedupePerRoom"], false)
-                ? MoonDedupeMode.PerRoom
-                : MoonDedupeMode.PerLevel;
+            DedupeMode = MoonDedupeMode.All;        // default / "All"
         }
 
         countedKeys.Clear();
