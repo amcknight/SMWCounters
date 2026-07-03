@@ -54,6 +54,9 @@
     <EmbeddedResource Include="Assets\jump.png">
       <LogicalName>LiveSplit.SmwCounters.Assets.jump.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Assets\mushroom.png">
+      <LogicalName>LiveSplit.SmwCounters.Assets.mushroom.png</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
