@@ -8,18 +8,16 @@ namespace LiveSplit.SmwCounters.Counters;
 
 internal sealed class ExitCounter : ISmwCounter
 {
-    // SNES WRAM $1F2E (ExitsCompleted): single byte, 0–96. Incremented in
-    // bank_04 when the overworld event-process routine resolves a goal or
-    // secret-goal event — the cleanest "exit was banked into the save file"
-    // signal in the game. NOT to be confused with $1FE2, which is sprite
-    // slot 0 of SpriteMisc1FE2 and ticks on sprite spawns (goal-tape
-    // sequence spawns several sprites, which previously caused +4 per exit).
-    // Source: SMWDisX rammap.asm + bank_04.asm `INC.W ExitsCompleted`.
-    private const int ExitCountOffset = 0x1F2E;
+    // SNES WRAM $0DD5 (exitMode): the end-of-level exit type. It shifts to a
+    // non-zero, non-128 value exactly when a level exit is completed. Ported
+    // from kaizosplits Watchers.cs (ToExit => Shifted(exitMode) && curr != 0
+    // && curr != 128). Event-based, so loading a save (which populates the
+    // $1F2E ExitsCompleted byte) does not fire it — unlike the old $1F2E watch.
+    private const int ExitModeOffset = 0x0DD5;
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.exit.png");
 
-    private readonly PreviousByte previousExits = new();
+    private readonly PreviousByte previousExitMode = new();
 
     public string Id => "exits";
     public Image DefaultIcon => icon;
@@ -30,28 +28,31 @@ internal sealed class ExitCounter : ISmwCounter
     public void Reset()
     {
         Value = 0;
-        previousExits.Clear();
+        previousExitMode.Clear();
     }
 
     public void Poll(ISnesMemory memory)
     {
         if (!memory.IsAttached)
         {
-            previousExits.Clear();
+            previousExitMode.Clear();
             return;
         }
 
-        if (!memory.ReadWramByte(ExitCountOffset, out byte exits))
+        if (!memory.ReadWramByte(ExitModeOffset, out byte exitMode))
         {
-            previousExits.Clear();
+            previousExitMode.Clear();
             return;
         }
 
-        if (previousExits.HasPrevious && exits > previousExits.Value)
+        if (previousExitMode.HasPrevious
+            && exitMode != previousExitMode.Value
+            && exitMode != 0
+            && exitMode != 128)
         {
             Value++;
         }
-        previousExits.Set(exits);
+        previousExitMode.Set(exitMode);
     }
 
     public void SaveState(XmlDocument doc, XmlElement parent)
@@ -62,6 +63,6 @@ internal sealed class ExitCounter : ISmwCounter
     public void LoadState(XmlElement parent)
     {
         Value = SettingsHelper.ParseInt(parent["Exits"], 0);
-        previousExits.Clear();
+        previousExitMode.Clear();
     }
 }
