@@ -11,7 +11,7 @@ public class SmwCountersComponentFactory : IComponentFactory
 {
     public string ComponentName => "SMW Counters";
 
-    public string Description => "Watches SNES WRAM in an emulator process and counts SMW deaths, moons, and more — pick which to show.";
+    public string Description => "Counts SMW deaths, exits, jumps, and 3-up moons from your emulator.";
 
     public ComponentCategory Category => ComponentCategory.Other;
 

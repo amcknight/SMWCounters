@@ -20,9 +20,9 @@ public class SmwCountersComponentSettings : UserControl
     private readonly Dictionary<string, string> labels = new();
 
     public KeyOrButton ResetKey { get; set; }
-    public int RowHeight { get; set; } = 40;
+    public int RowHeight { get; set; } = 50;
     public HAlignment Alignment { get; set; } = HAlignment.Center;
-    public bool ResetOnSplitsReset { get; set; } = false;
+    public bool ResetOnSplitsReset { get; set; } = true;
 
     public SmwCountersComponentSettings(bool allowGamepads)
     {
@@ -88,14 +88,17 @@ public class SmwCountersComponentSettings : UserControl
             row.ResetValue.Click += (_, __) => row.OnResetValue?.Invoke();
             Controls.Add(row.ResetValue);
 
-            y += 28;
-
             if (extras != null)
             {
+                y += 22;
                 extras.Location = new Point(30, y);
                 Controls.Add(extras);
                 row.CounterSpecific = extras;
-                y += extras.Height + 4;
+                y += extras.Height + 8;
+            }
+            else
+            {
+                y += 28;
             }
 
             rows.Add(row);
@@ -335,7 +338,7 @@ public class SmwCountersComponentSettings : UserControl
 
         XmlElement rst = e["ResetKey"];
         ResetKey = rst != null && !string.IsNullOrEmpty(rst.InnerText) ? new KeyOrButton(rst.InnerText) : null;
-        RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 40);
+        RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 50);
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
         ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], false);
 

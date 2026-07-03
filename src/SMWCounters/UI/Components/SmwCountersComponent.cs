@@ -65,8 +65,8 @@ public class SmwCountersComponent : IComponent
         counters = new ISmwCounter[]
         {
             new DeathCounter(),
-            moon,
             new ExitCounter(),
+            moon,
             new JumpCounter(),
         };
 
