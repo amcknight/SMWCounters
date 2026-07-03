@@ -15,6 +15,7 @@ internal sealed class MoonCounter : ISmwCounter
     private const int MoonCounterOffset = 0x13C5; // # of 3-up moons collected, per scene
     private const int LevelNumOffset    = 0x13BF; // translevel number
     private const int RoomNumOffset     = 0x010B; // sublevel within current level
+    private const int LevelStartOffset  = 0x1935; // in-level == 1 (kaizosplits InLevel)
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.moon.png");
 
@@ -42,6 +43,16 @@ internal sealed class MoonCounter : ISmwCounter
     public void Poll(ISnesMemory memory)
     {
         if (!memory.IsAttached)
+        {
+            previousMoon.Clear();
+            return;
+        }
+
+        // Only count while actually in a level. Outside a level (title,
+        // file-select, overworld, load transitions) $13C5 holds transient data
+        // whose changes fire spuriously — clear the baseline so re-entry
+        // establishes a fresh one instead of registering an edge.
+        if (!memory.ReadWramByte(LevelStartOffset, out byte levelStart) || levelStart != 1)
         {
             previousMoon.Clear();
             return;
