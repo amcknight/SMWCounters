@@ -10,8 +10,8 @@ internal interface ISmwCounter
     // Stable serialization key. Must not change once shipped.
     string Id { get; }
 
-    // Drawn in the layout row when the user hasn't set a per-counter label
-    // override. Null means the DefaultLabel text is used as a fallback.
+    // Icon drawn in the layout row for this counter. Null means the
+    // DefaultLabel text is drawn instead.
     Image DefaultIcon { get; }
 
     // Human-readable name shown in the settings dialog row label.

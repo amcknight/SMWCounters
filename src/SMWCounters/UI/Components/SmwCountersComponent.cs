@@ -355,6 +355,13 @@ public class SmwCountersComponent : IComponent
                 if (el != null) { c.LoadState(el); }
             }
         }
+
+        // Settings.SetSettings() above already called RefreshFromModel(), but
+        // that ran before LoadState restored each counter's Value, so the
+        // value boxes were populated from pre-load (typically zero) values.
+        // Re-sync now that the real restored values are in place, so the
+        // Leave/CommitValue path can't later commit a stale 0 over them.
+        Settings.RefreshFromModel();
     }
 
     public int GetSettingsHashCode()
