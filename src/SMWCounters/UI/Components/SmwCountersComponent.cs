@@ -383,6 +383,7 @@ public class SmwCountersComponent : IComponent
     public void Dispose()
     {
         pollTimer?.Dispose();
+        extrasToolTip?.Dispose();
         state.OnReset -= State_OnReset;
         Settings.Hook.KeyOrButtonPressed -= Hook_KeyOrButtonPressed;
         Settings.Hook.UnregisterAllHotkeys();

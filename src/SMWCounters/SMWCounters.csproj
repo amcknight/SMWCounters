@@ -44,14 +44,13 @@
     <PackageReference Include="PolySharp" Version="1.14.1" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- Dev convenience: after a build, drop the component DLL (+pdb) into the local
-       LiveSplit dev checkout's Components folder, mirroring how kaizosplits'
-       components output there, so a rebuild is picked up on the next LiveSplit
-       restart with no manual copy. Skipped when the folder is absent (CI, other
-       machines); override the destination with -p:ComponentsPath=... . -->
-  <PropertyGroup>
-    <ComponentsPath Condition="'$(ComponentsPath)' == ''">$(MSBuildProjectDirectory)\..\..\..\LiveSplit\bin\Components</ComponentsPath>
-  </PropertyGroup>
+  <!-- Dev convenience: after a build, drop the component DLL (+pdb) into a local
+       LiveSplit Components folder so a rebuild is picked up on the next LiveSplit
+       restart with no manual copy. The destination is machine-specific, so set
+       ComponentsPath in a gitignored SMWCounters.local.props (imported below) or
+       pass -p:ComponentsPath=... . The copy is skipped when the folder is absent
+       (CI, other machines, or no local props). -->
+  <Import Project="$(MSBuildThisFileDirectory)SMWCounters.local.props" Condition="Exists('$(MSBuildThisFileDirectory)SMWCounters.local.props')" />
 
   <Target Name="CopyToLiveSplitComponents" AfterTargets="Build" Condition="Exists('$(ComponentsPath)')">
     <!-- ContinueOnError: a running LiveSplit locks the loaded DLL; warn (close it)

@@ -12,6 +12,9 @@ lib/*.dll
 *.user
 *.suo
 
+# Machine-specific local build overrides (e.g. ComponentsPath copy target)
+*.local.props
+
 # OS noise
 Thumbs.db
 .DS_Store
