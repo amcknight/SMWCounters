@@ -31,6 +31,8 @@ internal sealed class DeathCounter : ISmwCounter
         previousAnimation.Clear();
     }
 
+    public void SetValue(int value) => Value = value;
+
     public void Poll(ISnesMemory memory)
     {
         if (!memory.IsAttached)

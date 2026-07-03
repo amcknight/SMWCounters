@@ -19,6 +19,11 @@ internal interface ISmwCounter
 
     int Value { get; }
 
+    // Overwrites the displayed value (used by the settings value box to seed or
+    // correct a count). For banked counters this sets both tallies so no alert
+    // remains.
+    void SetValue(int value);
+
     // True when the value should be drawn in the layout's negative/alert color
     // instead of the normal text color. Default-style: false for most counters.
     bool ValueIsAlert { get; }

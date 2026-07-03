@@ -63,6 +63,8 @@ internal sealed class JumpCounter : ISmwCounter
         previousBlocked.Clear();
     }
 
+    public void SetValue(int value) => Value = value;
+
     public void Poll(ISnesMemory memory)
     {
         if (!memory.IsAttached)

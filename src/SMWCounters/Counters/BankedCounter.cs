@@ -39,6 +39,12 @@ internal abstract class BankedCounter : ISmwCounter
         ClearDetectors();
     }
 
+    public void SetValue(int value)
+    {
+        total = value;
+        saved = value;
+    }
+
     public void Poll(ISnesMemory memory)
     {
         if (!memory.IsAttached)
