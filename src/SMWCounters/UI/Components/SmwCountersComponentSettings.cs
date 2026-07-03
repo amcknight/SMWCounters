@@ -33,6 +33,7 @@ public class SmwCountersComponentSettings : UserControl
     }
 
     private readonly List<CounterRow> rows = new();
+    private readonly ToolTip toolTip = new();
     private TextBox txtReset;
     private TrackBar trkHeight;
     private RadioButton rdoLeft;
@@ -99,6 +100,7 @@ public class SmwCountersComponentSettings : UserControl
                 if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; CommitValue(row); }
             };
             Controls.Add(row.ValueBox);
+            toolTip.SetToolTip(row.ValueBox, "This counter's current value. Type a number to set it (e.g. to continue a run).");
 
             row.ResetValue = new Button
             {
@@ -210,14 +212,23 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(lblStatus);
         y += 24;
 
-        var authorLabel = new Label
+        var author = new LinkLabel
         {
             Text = "created by twitch.tv/mangort",
             AutoSize = true,
-            ForeColor = System.Drawing.SystemColors.GrayText,
+            LinkColor = SystemColors.GrayText,
+            ActiveLinkColor = SystemColors.GrayText,
+            VisitedLinkColor = SystemColors.GrayText,
+            ForeColor = SystemColors.GrayText,
         };
-        Controls.Add(authorLabel);
-        authorLabel.Location = new Point(480 - authorLabel.PreferredWidth - 10, y);
+        author.LinkArea = new LinkArea(author.Text.IndexOf("twitch.tv"), "twitch.tv/mangort".Length);
+        author.LinkClicked += (_, __) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://twitch.tv/mangort") { UseShellExecute = true }); }
+            catch { }
+        };
+        Controls.Add(author);
+        author.Location = new Point(480 - author.PreferredWidth - 10, y);
         y += 20;
 
         Size = new Size(480, y + 10);
@@ -263,7 +274,22 @@ public class SmwCountersComponentSettings : UserControl
 
     protected override void Dispose(bool disposing)
     {
+        if (disposing) { toolTip?.Dispose(); }
         base.Dispose(disposing);
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (Visible) { RefreshValueBoxes(); }
+    }
+
+    private void RefreshValueBoxes()
+    {
+        foreach (CounterRow row in rows)
+        {
+            if (!row.ValueBox.Focused) { row.ValueBox.Text = row.GetValue().ToString(); }
+        }
     }
 
     private void CaptureKey(TextBox box, Action<KeyOrButton> setter)
