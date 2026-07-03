@@ -12,7 +12,7 @@ moons** — by reading SNES WRAM from your running emulator.
    [latest release](https://github.com/amcknight/SMWCounters/releases/latest).
 2. Copy it into the `Components` folder inside your LiveSplit install
    (e.g. `LiveSplit/Components/`).
-3. Start LiveSplit → right-click → **Edit Layout…** → **+** → **Information →
+3. Start LiveSplit → right-click → **Edit Layout…** → **+** → **Other →
    SMW Counters**.
 4. Save the layout.
 

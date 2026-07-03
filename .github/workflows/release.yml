@@ -64,6 +64,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.ver.outputs.version }}
+          body: |
+            ## Install
+            1. Download `SMWCounters.dll` below.
+            2. Copy it into your `LiveSplit/Components/` folder.
+            3. In LiveSplit: right-click → Edit Layout → **+** → **Other → SMW Counters**.
+
+            Requires a supported SNES emulator running Super Mario World, and the
+            LiveSplit timer running for counts to increment.
           files: |
             ${{ steps.stage.outputs.dll }}
             ${{ steps.stage.outputs.zip }}
