@@ -59,6 +59,8 @@ internal abstract class BankedCounter : ISmwCounter
             return;
         }
 
+        if (!Banked && total != saved) { saved = total; }
+
         if (DetectDeath(memory)) { total = saved; }
         if (DetectCollect(memory)) { total++; if (!Banked) { saved = total; } }
         if (DetectBank(memory)) { saved = total; }

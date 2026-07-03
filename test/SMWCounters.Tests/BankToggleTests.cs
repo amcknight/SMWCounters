@@ -41,4 +41,24 @@ public class BankToggleTests
         Assert.Equal(1, c.Value);
         Assert.False(c.ValueIsAlert);
     }
+
+    [Fact]
+    public void ToggleBankedOff_MidAlert_ReconcilesAndStopsAlertingAndSurvivesDeath()
+    {
+        var c = new PowerupCounter();               // Banked defaults to true
+        var m = new FakeSnesMemory();
+        Poll(c, m, 1, 0);                           // baseline in-level
+        Poll(c, m, 1, 2);                           // grab mushroom: total=1
+        Assert.Equal(1, c.Value);
+        Assert.True(c.ValueIsAlert);                // mid-alert: collected but not banked
+
+        c.Banked = false;                           // toggle off while mid-alert
+        Poll(c, m, 1, 2);                           // no collect, no death: just reconcile
+        Assert.Equal(1, c.Value);                   // Value unchanged
+        Assert.False(c.ValueIsAlert);                // gap closed: no longer alerting
+
+        Poll(c, m, 1, 9);                           // die: must NOT revert now that off
+        Assert.Equal(1, c.Value);
+        Assert.False(c.ValueIsAlert);
+    }
 }
