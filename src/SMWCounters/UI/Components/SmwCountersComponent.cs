@@ -172,10 +172,16 @@ public class SmwCountersComponent : IComponent
             {
                 if (Settings.IsEnabled(c.Id)) { c.Poll(inert); }
             }
+            Settings.SetStatus("timer not running — counting paused");
             return;
         }
 
-        if (!emu.TryAttach()) { return; }
+        if (!emu.TryAttach())
+        {
+            Settings.SetStatus(emu.LastError ?? "no emulator found");
+            return;
+        }
+        Settings.SetStatus("attached — " + emu.Describe());
         foreach (ISmwCounter c in counters)
         {
             if (Settings.IsEnabled(c.Id)) { c.Poll(emu); }

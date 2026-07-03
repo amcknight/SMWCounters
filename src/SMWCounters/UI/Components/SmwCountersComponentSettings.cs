@@ -36,6 +36,7 @@ public class SmwCountersComponentSettings : UserControl
     private TrackBar trkHeight;
     private ComboBox cboAlignment;
     private CheckBox chkResetOnSplitsReset;
+    private Label lblStatus;
 
     private sealed class CounterRow
     {
@@ -182,6 +183,16 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(chkResetOnSplitsReset);
         y += 28;
 
+        lblStatus = new Label
+        {
+            Text = "Emulator: (not polled yet)",
+            Location = new Point(10, y),
+            AutoSize = true,
+            ForeColor = System.Drawing.SystemColors.GrayText,
+        };
+        Controls.Add(lblStatus);
+        y += 24;
+
         Size = new Size(360, y + 10);
 
         RegisterHotKeys();
@@ -284,6 +295,12 @@ public class SmwCountersComponentSettings : UserControl
             if (i != -1) { s = s[..i]; }
         }
         return s;
+    }
+
+    // Called by the component each poll to surface emulator attach state.
+    public void SetStatus(string text)
+    {
+        if (lblStatus != null) { lblStatus.Text = "Emulator: " + text; }
     }
 
     public bool IsEnabled(string counterId) => enabled.Contains(counterId);
