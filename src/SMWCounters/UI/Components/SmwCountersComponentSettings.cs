@@ -18,6 +18,8 @@ public class SmwCountersComponentSettings : UserControl
 
     private readonly HashSet<string> enabled = new() { "deaths", "exits" };
     private readonly Dictionary<string, string> labels = new();
+    // Counters with banking turned OFF (plain-tally). Absent id => banking ON.
+    private readonly HashSet<string> bankDisabled = new();
 
     public KeyOrButton ResetKey { get; set; }
     public int RowHeight { get; set; } = 50;
@@ -325,6 +327,14 @@ public class SmwCountersComponentSettings : UserControl
         else { labels[counterId] = label; }
     }
 
+    public bool IsBankOnSave(string counterId) => !bankDisabled.Contains(counterId);
+
+    public void SetBankOnSave(string counterId, bool value)
+    {
+        if (value) { bankDisabled.Remove(counterId); }
+        else { bankDisabled.Add(counterId); }
+    }
+
     public XmlNode GetSettings(XmlDocument document)
     {
         XmlElement parent = document.CreateElement("Settings");
@@ -366,6 +376,16 @@ public class SmwCountersComponentSettings : UserControl
             }
         }
 
+        bankDisabled.Clear();
+        XmlElement bankNode = e["BankDisabled"];
+        if (bankNode != null)
+        {
+            foreach (XmlElement c in bankNode.GetElementsByTagName("Counter"))
+            {
+                if (!string.IsNullOrEmpty(c.InnerText)) { bankDisabled.Add(c.InnerText); }
+            }
+        }
+
         RefreshFromModel();
     }
 
@@ -399,6 +419,15 @@ public class SmwCountersComponentSettings : UserControl
                 labelsNode.AppendChild(l);
             }
             parent.AppendChild(labelsNode);
+
+            XmlElement bankNode = document.CreateElement("BankDisabled");
+            foreach (string id in bankDisabled)
+            {
+                XmlElement c = document.CreateElement("Counter");
+                c.InnerText = id;
+                bankNode.AppendChild(c);
+            }
+            parent.AppendChild(bankNode);
         }
 
         foreach (string id in enabled) { hash ^= id.GetHashCode(); }
@@ -406,6 +435,7 @@ public class SmwCountersComponentSettings : UserControl
         {
             hash ^= kv.Key.GetHashCode() ^ (kv.Value ?? "").GetHashCode();
         }
+        foreach (string id in bankDisabled) { hash ^= id.GetHashCode(); }
         return hash;
     }
 }

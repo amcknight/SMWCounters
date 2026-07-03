@@ -141,6 +141,20 @@ public class SmwCountersComponent : IComponent
             panel.Controls.Add(rdoRoom);
             return panel;
         }
+        if (counter is BankedCounter)
+        {
+            var chk = new CheckBox
+            {
+                Text = "Bank on save",
+                AutoSize = true,
+                Checked = Settings.IsBankOnSave(counter.Id),
+                Location = new Point(0, 4),
+            };
+            chk.CheckedChanged += (_, __) => Settings.SetBankOnSave(counter.Id, chk.Checked);
+            var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
+            panel.Controls.Add(chk);
+            return panel;
+        }
         return null;
     }
 
@@ -185,6 +199,7 @@ public class SmwCountersComponent : IComponent
         Settings.SetStatus("attached — " + emu.Describe());
         foreach (ISmwCounter c in counters)
         {
+            if (c is BankedCounter bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }
             if (Settings.IsEnabled(c.Id)) { c.Poll(emu); }
         }
     }
