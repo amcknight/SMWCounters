@@ -4,9 +4,10 @@
     <RootNamespace>LiveSplit</RootNamespace>
     <UseWindowsForms>true</UseWindowsForms>
     <TargetFramework>net4.8.1</TargetFramework>
+    <AssemblyName>SMWCounters</AssemblyName>
 
     <EnableDynamicLoading>true</EnableDynamicLoading>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Company>Andrew McKnight</Company>
     <Product>LiveSplit SMW Counters</Product>
   </PropertyGroup>
