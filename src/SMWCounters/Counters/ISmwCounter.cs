@@ -10,14 +10,19 @@ internal interface ISmwCounter
     // Stable serialization key. Must not change once shipped.
     string Id { get; }
 
-    // Drawn in the layout row when the user hasn't set a per-counter label
-    // override. Null means the DefaultLabel text is used as a fallback.
+    // Icon drawn in the layout row for this counter. Null means the
+    // DefaultLabel text is drawn instead.
     Image DefaultIcon { get; }
 
     // Human-readable name shown in the settings dialog row label.
     string DefaultLabel { get; }
 
     int Value { get; }
+
+    // Overwrites the displayed value (used by the settings value box to seed or
+    // correct a count). For banked counters this sets both tallies so no alert
+    // remains.
+    void SetValue(int value);
 
     // True when the value should be drawn in the layout's negative/alert color
     // instead of the normal text color. Default-style: false for most counters.

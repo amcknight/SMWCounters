@@ -7,7 +7,10 @@
     <AssemblyName>SMWCounters</AssemblyName>
 
     <EnableDynamicLoading>true</EnableDynamicLoading>
-    <Version>0.1.2</Version>
+    <!-- So Visual Studio's fast up-to-date check doesn't skip the post-build
+         copy-to-Components step below (the CLI runs it every build regardless). -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    <Version>0.2.0</Version>
     <Company>Andrew McKnight</Company>
     <Product>LiveSplit SMW Counters</Product>
   </PropertyGroup>
@@ -40,6 +43,24 @@
   <ItemGroup>
     <PackageReference Include="PolySharp" Version="1.14.1" PrivateAssets="all" />
   </ItemGroup>
+
+  <!-- Dev convenience: after a build, drop the component DLL (+pdb) into a local
+       LiveSplit Components folder so a rebuild is picked up on the next LiveSplit
+       restart with no manual copy. The destination is machine-specific, so set
+       ComponentsPath in a gitignored SMWCounters.local.props (imported below) or
+       pass -p:ComponentsPath=... . The copy is skipped when the folder is absent
+       (CI, other machines, or no local props). -->
+  <Import Project="$(MSBuildThisFileDirectory)SMWCounters.local.props" Condition="Exists('$(MSBuildThisFileDirectory)SMWCounters.local.props')" />
+
+  <Target Name="CopyToLiveSplitComponents" AfterTargets="Build" Condition="Exists('$(ComponentsPath)')">
+    <!-- ContinueOnError: a running LiveSplit locks the loaded DLL; warn (close it)
+         instead of failing the build. Touch: stamp the copy time so a rebuild
+         visibly updates the file (Copy otherwise preserves the source mtime). -->
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ComponentsPath)" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ComponentsPath)" Condition="Exists('$(TargetDir)$(TargetName).pdb')" ContinueOnError="true" />
+    <Touch Files="$(ComponentsPath)\$(TargetFileName)" ContinueOnError="true" />
+    <Message Importance="high" Text="SMWCounters: copied $(TargetFileName) to $(ComponentsPath)" />
+  </Target>
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\death.png">

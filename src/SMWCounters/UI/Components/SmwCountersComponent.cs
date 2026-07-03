@@ -33,12 +33,13 @@ public class SmwCountersComponent : IComponent
     }
 
     // All known counters, registered at construction. The Settings hold the
-    // user's enabled subset and label overrides.
+    // user's enabled subset.
     private readonly IReadOnlyList<ISmwCounter> counters;
 
     private readonly Dictionary<string, SimpleLabel> labelCells = new();
     private readonly Dictionary<string, SimpleLabel> valueCells = new();
     private readonly GraphicsCache cache = new();
+    private readonly System.Windows.Forms.ToolTip extrasToolTip = new();
 
     public SmwCountersComponentSettings Settings { get; }
 
@@ -83,11 +84,13 @@ public class SmwCountersComponent : IComponent
 
         // Wire up per-counter rows. Counter-specific extras live here so the
         // settings UserControl doesn't know about individual counter types.
-        var rows = new List<(string Id, string DefaultLabel, Control Extras, Action ResetValue)>();
+        var rows = new List<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue, Action RefreshExtras)>();
         foreach (ISmwCounter c in counters)
         {
-            Control extras = BuildExtras(c);
-            rows.Add((c.Id, c.DefaultLabel, extras, () => c.Reset()));
+            ISmwCounter counter = c; // capture per-iteration
+            (Control extras, Action refreshExtras) = BuildExtras(counter);
+            rows.Add((counter.Id, counter.DefaultLabel, extras, () => counter.Reset(),
+                      () => counter.Value, v => counter.SetValue(v), refreshExtras));
         }
         Settings.BuildUi(rows);
 
@@ -107,41 +110,40 @@ public class SmwCountersComponent : IComponent
         }
     }
 
-    private Control BuildExtras(ISmwCounter counter)
+    private (Control control, Action refresh) BuildExtras(ISmwCounter counter)
     {
         if (counter is MoonCounter moon)
         {
-            var panel = new Panel { Width = 400, Height = 24, Padding = new Padding(0) };
-            var rdoAll = new RadioButton
+            var chk = new CheckBox
             {
-                Text = "All",
-                AutoSize = true,
-                Checked = moon.DedupeMode == MoonDedupeMode.All,
-                Location = new Point(0, 4),
-            };
-            var rdoLevel = new RadioButton
-            {
-                Text = "Per level",
+                Text = "One per level",
                 AutoSize = true,
                 Checked = moon.DedupeMode == MoonDedupeMode.PerLevel,
-                Location = new Point(48, 4),
+                Location = new Point(0, 4),
             };
-            var rdoRoom = new RadioButton
-            {
-                Text = "Per room",
-                AutoSize = true,
-                Checked = moon.DedupeMode == MoonDedupeMode.PerRoom,
-                Location = new Point(130, 4),
-            };
-            rdoAll.CheckedChanged   += (_, __) => { if (rdoAll.Checked)   { moon.DedupeMode = MoonDedupeMode.All; } };
-            rdoLevel.CheckedChanged += (_, __) => { if (rdoLevel.Checked) { moon.DedupeMode = MoonDedupeMode.PerLevel; } };
-            rdoRoom.CheckedChanged  += (_, __) => { if (rdoRoom.Checked)  { moon.DedupeMode = MoonDedupeMode.PerRoom; } };
-            panel.Controls.Add(rdoAll);
-            panel.Controls.Add(rdoLevel);
-            panel.Controls.Add(rdoRoom);
-            return panel;
+            chk.CheckedChanged += (_, __) => moon.DedupeMode = chk.Checked ? MoonDedupeMode.PerLevel : MoonDedupeMode.All;
+            var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
+            panel.Controls.Add(chk);
+            Action refresh = () => chk.Checked = moon.DedupeMode == MoonDedupeMode.PerLevel;
+            return (panel, refresh);
         }
-        return null;
+        if (counter is PowerupCounter)
+        {
+            var chk = new CheckBox
+            {
+                Text = "Discard on death",
+                AutoSize = true,
+                Checked = Settings.IsBankOnSave(counter.Id),
+                Location = new Point(0, 4),
+            };
+            chk.CheckedChanged += (_, __) => Settings.SetBankOnSave(counter.Id, chk.Checked);
+            extrasToolTip.SetToolTip(chk, "Unbanked powerups (shown gold) are discarded if you die before a checkpoint or exit.");
+            var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
+            panel.Controls.Add(chk);
+            Action refresh = () => chk.Checked = Settings.IsBankOnSave(counter.Id);
+            return (panel, refresh);
+        }
+        return (null, null);
     }
 
     private void Hook_KeyOrButtonPressed(object sender, KeyOrButton e)
@@ -173,28 +175,21 @@ public class SmwCountersComponent : IComponent
             {
                 if (Settings.IsEnabled(c.Id)) { c.Poll(inert); }
             }
-            Settings.SetStatus("timer not running — counting paused");
+            Settings.SetStatus("Paused · timer not running");
             return;
         }
 
         if (!emu.TryAttach())
         {
-            Settings.SetStatus(emu.LastError ?? "no emulator found");
+            Settings.SetStatus(emu.LastError ?? "No emulator found");
             return;
         }
-        Settings.SetStatus("attached — " + emu.Describe());
+        Settings.SetStatus("Counting · " + emu.Describe());
         foreach (ISmwCounter c in counters)
         {
+            if (c is PowerupCounter pc) { pc.Banked = Settings.IsBankOnSave(c.Id); }
             if (Settings.IsEnabled(c.Id)) { c.Poll(emu); }
         }
-    }
-
-    // Returns the label-override text the user typed, or null when the row
-    // should draw the default icon instead.
-    private string OverrideTextOrNull(ISmwCounter c)
-    {
-        string overrideText = Settings.GetLabelOverride(c.Id);
-        return string.IsNullOrEmpty(overrideText) ? null : overrideText;
     }
 
     public void Update(IInvalidator invalidator, LiveSplitState state, float width, float height, LayoutMode mode)
@@ -205,14 +200,9 @@ public class SmwCountersComponent : IComponent
         foreach (ISmwCounter c in counters)
         {
             if (!Settings.IsEnabled(c.Id)) { continue; }
-            string overrideText = OverrideTextOrNull(c);
             string value = c.Value.ToString();
             valueCells[c.Id].Text = value;
-            // Cache key is either the override text or "<icon>" so flipping
-            // between override-text and default-icon invalidates correctly.
-            // labelCells[c.Id].Text is set in DrawGeneral, where the icon-vs-text
-            // decision is final.
-            cache[c.Id + ".label"] = overrideText ?? (c.DefaultIcon != null ? "<icon>" : c.DefaultLabel);
+            cache[c.Id + ".label"] = c.DefaultIcon != null ? "<icon>" : c.DefaultLabel;
             cache[c.Id + ".value"] = value;
             cache[c.Id + ".alert"] = c.ValueIsAlert;
         }
@@ -239,18 +229,15 @@ public class SmwCountersComponent : IComponent
         int iconHeight = (int)Math.Round(0.85f * Settings.RowHeight);
 
         // Measure each enabled counter's cell width: label-slot + " " + value.
-        // Label slot is icon-aspect-scaled when defaulting, override-text width otherwise.
+        // Label slot is icon-aspect-scaled when the counter has an icon, else default-label text width.
         var enabled = counters.Where(c => Settings.IsEnabled(c.Id)).ToList();
         float totalWidth = 0f;
         var cellWidths = new Dictionary<string, (float labelW, float valueW)>();
         foreach (ISmwCounter c in enabled)
         {
-            string overrideText = OverrideTextOrNull(c);
-            float labelW = overrideText != null
-                ? g.MeasureString(overrideText, font).Width
-                : c.DefaultIcon != null
-                    ? IconWidthFor(c.DefaultIcon, iconHeight)
-                    : g.MeasureString(c.DefaultLabel, font).Width;
+            float labelW = c.DefaultIcon != null
+                ? IconWidthFor(c.DefaultIcon, iconHeight)
+                : g.MeasureString(c.DefaultLabel, font).Width;
             float valueW = g.MeasureString(c.Value.ToString("0"), font).Width;
             cellWidths[c.Id] = (labelW, valueW);
             if (totalWidth > 0) { totalWidth += CellGap; }
@@ -268,21 +255,20 @@ public class SmwCountersComponent : IComponent
         foreach (ISmwCounter c in enabled)
         {
             (float labelW, float valueW) = cellWidths[c.Id];
-            string overrideText = OverrideTextOrNull(c);
 
-            if (overrideText == null && c.DefaultIcon != null)
+            if (c.DefaultIcon != null)
             {
                 DrawIcon(g, c.DefaultIcon, x, height, labelW, iconHeight);
             }
-            else if (overrideText != null || c.DefaultIcon == null)
+            else
             {
-                labelCells[c.Id].Text = overrideText ?? c.DefaultLabel;
+                labelCells[c.Id].Text = c.DefaultLabel;
                 ConfigureLabel(labelCells[c.Id], font, textColor, StringAlignment.Near, x, labelW, height);
                 labelCells[c.Id].Draw(g);
             }
             x += labelW + 4;
 
-            Color valueColor = c.ValueIsAlert ? state.LayoutSettings.BehindLosingTimeColor : textColor;
+            Color valueColor = c.ValueIsAlert ? state.LayoutSettings.BestSegmentColor : textColor;
             ConfigureLabel(valueCells[c.Id], font, valueColor, StringAlignment.Near, x, valueW, height);
             valueCells[c.Id].Draw(g);
             x += valueW + CellGap;
@@ -355,6 +341,13 @@ public class SmwCountersComponent : IComponent
                 if (el != null) { c.LoadState(el); }
             }
         }
+
+        // Settings.SetSettings() above already called RefreshFromModel(), but
+        // that ran before LoadState restored each counter's Value, so the
+        // value boxes were populated from pre-load (typically zero) values.
+        // Re-sync now that the real restored values are in place, so the
+        // Leave/CommitValue path can't later commit a stale 0 over them.
+        Settings.RefreshFromModel();
     }
 
     public int GetSettingsHashCode()
@@ -367,6 +360,7 @@ public class SmwCountersComponent : IComponent
     public void Dispose()
     {
         pollTimer?.Dispose();
+        extrasToolTip?.Dispose();
         state.OnReset -= State_OnReset;
         Settings.Hook.KeyOrButtonPressed -= Hook_KeyOrButtonPressed;
         Settings.Hook.UnregisterAllHotkeys();

@@ -17,10 +17,11 @@ public class SmwCountersComponentSettings : UserControl
     public CompositeHook Hook { get; }
 
     private readonly HashSet<string> enabled = new() { "deaths", "exits" };
-    private readonly Dictionary<string, string> labels = new();
+    // Counters with banking turned OFF (plain-tally). Absent id => banking ON.
+    private readonly HashSet<string> bankDisabled = new();
 
     public KeyOrButton ResetKey { get; set; }
-    public int RowHeight { get; set; } = 50;
+    public int RowHeight { get; set; } = 45;
     public HAlignment Alignment { get; set; } = HAlignment.Center;
     public bool ResetOnSplitsReset { get; set; } = true;
 
@@ -34,7 +35,9 @@ public class SmwCountersComponentSettings : UserControl
     private readonly List<CounterRow> rows = new();
     private TextBox txtReset;
     private TrackBar trkHeight;
-    private ComboBox cboAlignment;
+    private RadioButton rdoLeft;
+    private RadioButton rdoCenter;
+    private RadioButton rdoRight;
     private CheckBox chkResetOnSplitsReset;
     private Label lblStatus;
 
@@ -42,66 +45,81 @@ public class SmwCountersComponentSettings : UserControl
     {
         public string Id;
         public CheckBox Enable;
-        public TextBox Label;
+        public TextBox ValueBox;
         public Button ResetValue;
-        public Action OnResetValue; // set by the component
-        public Control CounterSpecific; // optional extra control (e.g. moon dedupe radio)
+        public Action OnResetValue;
+        public Func<int> GetValue;
+        public Action<int> SetValue;
+        public Control CounterSpecific;
+        public Action RefreshExtras;
     }
 
     // Component calls this once at construction with the list of known counters.
-    public void BuildUi(IReadOnlyList<(string Id, string DefaultLabel, Control Extras, Action ResetValue)> counters)
+    public void BuildUi(IReadOnlyList<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue, Action RefreshExtras)> counters)
     {
         Controls.Clear();
         rows.Clear();
 
         int y = 10;
 
-        foreach ((string id, string defaultLabel, Control extras, Action resetValue) in counters)
+        foreach ((string id, string defaultLabel, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue, Action refreshExtras) in counters)
         {
-            var row = new CounterRow { Id = id, OnResetValue = resetValue };
+            var row = new CounterRow
+            {
+                Id = id,
+                OnResetValue = resetValue,
+                GetValue = getValue,
+                SetValue = setValue,
+                RefreshExtras = refreshExtras,
+            };
 
             row.Enable = new CheckBox
             {
                 Text = defaultLabel,
-                Location = new Point(10, y),
+                Location = new Point(10, y + 2),
                 AutoSize = true,
                 Checked = IsEnabled(id),
             };
-            row.Enable.CheckedChanged += (_, __) => SetEnabled(id, row.Enable.Checked);
+            row.Enable.CheckedChanged += (_, __) =>
+            {
+                SetEnabled(id, row.Enable.Checked);
+                SyncRowEnabled(row);
+            };
             Controls.Add(row.Enable);
 
-            row.Label = new TextBox
+            row.ValueBox = new TextBox
             {
-                Text = GetLabelOverride(id) ?? "",
-                Location = new Point(120, y - 2),
-                Width = 120,
+                Text = getValue().ToString(),
+                Location = new Point(140, y),
+                Width = 36,
+                TextAlign = HorizontalAlignment.Right,
             };
-            row.Label.TextChanged += (_, __) => SetLabelOverride(id, row.Label.Text);
-            Controls.Add(row.Label);
+            row.ValueBox.Leave += (_, __) => CommitValue(row);
+            row.ValueBox.KeyDown += (_, e) =>
+            {
+                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; CommitValue(row); }
+            };
+            Controls.Add(row.ValueBox);
 
             row.ResetValue = new Button
             {
-                Text = "Reset value",
-                Location = new Point(250, y - 4),
+                Text = "Reset",
+                Location = new Point(195, y - 2),
                 AutoSize = true,
             };
-            row.ResetValue.Click += (_, __) => row.OnResetValue?.Invoke();
+            row.ResetValue.Click += (_, __) => { row.OnResetValue?.Invoke(); row.ValueBox.Text = row.GetValue().ToString(); };
             Controls.Add(row.ResetValue);
 
             if (extras != null)
             {
-                y += 22;
-                extras.Location = new Point(30, y);
+                extras.Location = new Point(275, y);
                 Controls.Add(extras);
                 row.CounterSpecific = extras;
-                y += extras.Height + 8;
-            }
-            else
-            {
-                y += 28;
             }
 
+            SyncRowEnabled(row);
             rows.Add(row);
+            y += 30;
         }
 
         Controls.Add(new Label
@@ -153,8 +171,6 @@ public class SmwCountersComponentSettings : UserControl
         };
         Controls.Add(trkHeight);
         Controls.Add(lblHeightVal);
-        // TrackBar paints its slider/ticks beyond its nominal Height, so the
-        // next row needs extra clearance to avoid clipping the control below.
         y += 48;
 
         Controls.Add(new Label
@@ -163,16 +179,15 @@ public class SmwCountersComponentSettings : UserControl
             Location = new Point(10, y + 4),
             AutoSize = true,
         });
-        cboAlignment = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(100, y),
-            Width = 100,
-        };
-        cboAlignment.Items.AddRange(new object[] { "Left", "Center", "Right" });
-        cboAlignment.SelectedIndex = (int)Alignment;
-        cboAlignment.SelectedIndexChanged += (_, __) => Alignment = (HAlignment)cboAlignment.SelectedIndex;
-        Controls.Add(cboAlignment);
+        rdoLeft = new RadioButton { Text = "Left", AutoSize = true, Location = new Point(100, y + 2), Checked = Alignment == HAlignment.Left };
+        rdoCenter = new RadioButton { Text = "Center", AutoSize = true, Location = new Point(150, y + 2), Checked = Alignment == HAlignment.Center };
+        rdoRight = new RadioButton { Text = "Right", AutoSize = true, Location = new Point(215, y + 2), Checked = Alignment == HAlignment.Right };
+        rdoLeft.CheckedChanged += (_, __) => { if (rdoLeft.Checked) { Alignment = HAlignment.Left; } };
+        rdoCenter.CheckedChanged += (_, __) => { if (rdoCenter.Checked) { Alignment = HAlignment.Center; } };
+        rdoRight.CheckedChanged += (_, __) => { if (rdoRight.Checked) { Alignment = HAlignment.Right; } };
+        Controls.Add(rdoLeft);
+        Controls.Add(rdoCenter);
+        Controls.Add(rdoRight);
         y += 30;
 
         chkResetOnSplitsReset = new CheckBox
@@ -188,7 +203,7 @@ public class SmwCountersComponentSettings : UserControl
 
         lblStatus = new Label
         {
-            Text = "Emulator: (not polled yet)",
+            Text = "(not polled yet)",
             Location = new Point(10, y),
             AutoSize = true,
             ForeColor = System.Drawing.SystemColors.GrayText,
@@ -196,9 +211,42 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(lblStatus);
         y += 24;
 
-        Size = new Size(360, y + 10);
+        var author = new LinkLabel
+        {
+            Text = "created by twitch.tv/mangort",
+            AutoSize = true,
+            LinkColor = SystemColors.GrayText,
+            ActiveLinkColor = SystemColors.GrayText,
+            VisitedLinkColor = SystemColors.GrayText,
+            ForeColor = SystemColors.GrayText,
+        };
+        author.LinkArea = new LinkArea(author.Text.IndexOf("twitch.tv"), "twitch.tv/mangort".Length);
+        author.LinkClicked += (_, __) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://twitch.tv/mangort") { UseShellExecute = true }); }
+            catch { }
+        };
+        Controls.Add(author);
+        author.Location = new Point(480 - author.PreferredWidth - 10, y);
+        y += 20;
+
+        Size = new Size(480, y + 10);
 
         RegisterHotKeys();
+    }
+
+    private void CommitValue(CounterRow row)
+    {
+        if (int.TryParse(row.ValueBox.Text, out int v)) { row.SetValue(v); }
+        row.ValueBox.Text = row.GetValue().ToString();
+    }
+
+    private static void SyncRowEnabled(CounterRow row)
+    {
+        bool on = row.Enable.Checked;
+        row.ValueBox.Enabled = on;
+        row.ResetValue.Enabled = on;
+        if (row.CounterSpecific != null) { row.CounterSpecific.Enabled = on; }
     }
 
     // Re-syncs visible row widgets from the data model after SetSettings is called.
@@ -207,11 +255,18 @@ public class SmwCountersComponentSettings : UserControl
         foreach (CounterRow row in rows)
         {
             row.Enable.Checked = IsEnabled(row.Id);
-            row.Label.Text = GetLabelOverride(row.Id) ?? "";
+            row.ValueBox.Text = row.GetValue().ToString();
+            SyncRowEnabled(row);
+            row.RefreshExtras?.Invoke();
         }
         if (txtReset != null) { txtReset.Text = FormatKey(ResetKey); }
         if (trkHeight != null) { trkHeight.Value = Math.Max(trkHeight.Minimum, Math.Min(trkHeight.Maximum, RowHeight)); }
-        if (cboAlignment != null) { cboAlignment.SelectedIndex = (int)Alignment; }
+        if (rdoLeft != null)
+        {
+            rdoLeft.Checked = Alignment == HAlignment.Left;
+            rdoCenter.Checked = Alignment == HAlignment.Center;
+            rdoRight.Checked = Alignment == HAlignment.Right;
+        }
         if (chkResetOnSplitsReset != null) { chkResetOnSplitsReset.Checked = ResetOnSplitsReset; }
         RegisterHotKeys();
     }
@@ -219,6 +274,20 @@ public class SmwCountersComponentSettings : UserControl
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (Visible) { RefreshValueBoxes(); }
+    }
+
+    private void RefreshValueBoxes()
+    {
+        foreach (CounterRow row in rows)
+        {
+            if (!row.ValueBox.Focused) { row.ValueBox.Text = row.GetValue().ToString(); }
+        }
     }
 
     private void CaptureKey(TextBox box, Action<KeyOrButton> setter)
@@ -303,7 +372,7 @@ public class SmwCountersComponentSettings : UserControl
     // Called by the component each poll to surface emulator attach state.
     public void SetStatus(string text)
     {
-        if (lblStatus != null) { lblStatus.Text = "Emulator: " + text; }
+        if (lblStatus != null) { lblStatus.Text = text; }
     }
 
     public bool IsEnabled(string counterId) => enabled.Contains(counterId);
@@ -316,13 +385,12 @@ public class SmwCountersComponentSettings : UserControl
 
     public IEnumerable<string> EnabledIds => enabled;
 
-    public string GetLabelOverride(string counterId) =>
-        labels.TryGetValue(counterId, out string s) ? s : null;
+    public bool IsBankOnSave(string counterId) => !bankDisabled.Contains(counterId);
 
-    public void SetLabelOverride(string counterId, string label)
+    public void SetBankOnSave(string counterId, bool value)
     {
-        if (string.IsNullOrEmpty(label)) { labels.Remove(counterId); }
-        else { labels[counterId] = label; }
+        if (value) { bankDisabled.Remove(counterId); }
+        else { bankDisabled.Add(counterId); }
     }
 
     public XmlNode GetSettings(XmlDocument document)
@@ -338,7 +406,7 @@ public class SmwCountersComponentSettings : UserControl
 
         XmlElement rst = e["ResetKey"];
         ResetKey = rst != null && !string.IsNullOrEmpty(rst.InnerText) ? new KeyOrButton(rst.InnerText) : null;
-        RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 50);
+        RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 45);
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
         ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], true);
 
@@ -352,17 +420,13 @@ public class SmwCountersComponentSettings : UserControl
             }
         }
 
-        labels.Clear();
-        XmlElement labelsNode = e["CounterLabels"];
-        if (labelsNode != null)
+        bankDisabled.Clear();
+        XmlElement bankNode = e["BankDisabled"];
+        if (bankNode != null)
         {
-            foreach (XmlElement l in labelsNode.GetElementsByTagName("Label"))
+            foreach (XmlElement c in bankNode.GetElementsByTagName("Counter"))
             {
-                string id = l.GetAttribute("id");
-                if (!string.IsNullOrEmpty(id))
-                {
-                    labels[id] = l.InnerText ?? "";
-                }
+                if (!string.IsNullOrEmpty(c.InnerText)) { bankDisabled.Add(c.InnerText); }
             }
         }
 
@@ -390,22 +454,18 @@ public class SmwCountersComponentSettings : UserControl
             }
             parent.AppendChild(enabledNode);
 
-            XmlElement labelsNode = document.CreateElement("CounterLabels");
-            foreach (KeyValuePair<string, string> kv in labels)
+            XmlElement bankNode = document.CreateElement("BankDisabled");
+            foreach (string id in bankDisabled)
             {
-                XmlElement l = document.CreateElement("Label");
-                l.SetAttribute("id", kv.Key);
-                l.InnerText = kv.Value;
-                labelsNode.AppendChild(l);
+                XmlElement c = document.CreateElement("Counter");
+                c.InnerText = id;
+                bankNode.AppendChild(c);
             }
-            parent.AppendChild(labelsNode);
+            parent.AppendChild(bankNode);
         }
 
         foreach (string id in enabled) { hash ^= id.GetHashCode(); }
-        foreach (KeyValuePair<string, string> kv in labels)
-        {
-            hash ^= kv.Key.GetHashCode() ^ (kv.Value ?? "").GetHashCode();
-        }
+        foreach (string id in bankDisabled) { hash ^= id.GetHashCode(); }
         return hash;
     }
 }
