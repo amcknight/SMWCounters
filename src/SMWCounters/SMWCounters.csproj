@@ -10,7 +10,7 @@
     <!-- So Visual Studio's fast up-to-date check doesn't skip the post-build
          copy-to-Components step below (the CLI runs it every build regardless). -->
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
-    <Version>0.1.3</Version>
+    <Version>0.2.0</Version>
     <Company>Andrew McKnight</Company>
     <Product>LiveSplit SMW Counters</Product>
   </PropertyGroup>
