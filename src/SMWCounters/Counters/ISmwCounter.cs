@@ -19,6 +19,10 @@ internal interface ISmwCounter
 
     int Value { get; }
 
+    // True when the value should be drawn in the layout's negative/alert color
+    // instead of the normal text color. Default-style: false for most counters.
+    bool ValueIsAlert { get; }
+
     void Reset();
 
     // Called once per poll tick when the component is attached. The counter

@@ -34,6 +34,7 @@ namespace LiveSplit.SmwCounters.Counters;
 // bounce routine.
 internal sealed class JumpCounter : ISmwCounter
 {
+    private const int LevelStartOffset  = 0x1935;
     private const int PlayerInAirOffset = 0x0072;
     private const int BlockedDirOffset  = 0x0077;
 
@@ -53,6 +54,8 @@ internal sealed class JumpCounter : ISmwCounter
 
     public int Value { get; private set; }
 
+    public bool ValueIsAlert => false;
+
     public void Reset()
     {
         Value = 0;
@@ -63,6 +66,13 @@ internal sealed class JumpCounter : ISmwCounter
     public void Poll(ISnesMemory memory)
     {
         if (!memory.IsAttached)
+        {
+            previousAir.Clear();
+            previousBlocked.Clear();
+            return;
+        }
+
+        if (!memory.ReadWramByte(LevelStartOffset, out byte levelStart) || levelStart != 1)
         {
             previousAir.Clear();
             previousBlocked.Clear();

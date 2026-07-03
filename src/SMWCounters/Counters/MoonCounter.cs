@@ -31,6 +31,8 @@ internal sealed class MoonCounter : ISmwCounter
 
     public int Value { get; private set; }
 
+    public bool ValueIsAlert => false;
+
     public MoonDedupeMode DedupeMode { get; set; } = MoonDedupeMode.All;
 
     public void Reset()

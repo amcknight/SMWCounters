@@ -68,6 +68,7 @@ public class SmwCountersComponent : IComponent
             new ExitCounter(),
             moon,
             new JumpCounter(),
+            new PowerupCounter(),
         };
 
         foreach (ISmwCounter c in counters)
@@ -213,6 +214,7 @@ public class SmwCountersComponent : IComponent
             // decision is final.
             cache[c.Id + ".label"] = overrideText ?? (c.DefaultIcon != null ? "<icon>" : c.DefaultLabel);
             cache[c.Id + ".value"] = value;
+            cache[c.Id + ".alert"] = c.ValueIsAlert;
         }
 
         if (invalidator != null && cache.HasChanged)
@@ -280,7 +282,8 @@ public class SmwCountersComponent : IComponent
             }
             x += labelW + 4;
 
-            ConfigureLabel(valueCells[c.Id], font, textColor, StringAlignment.Near, x, valueW, height);
+            Color valueColor = c.ValueIsAlert ? state.LayoutSettings.BehindLosingTimeColor : textColor;
+            ConfigureLabel(valueCells[c.Id], font, valueColor, StringAlignment.Near, x, valueW, height);
             valueCells[c.Id].Draw(g);
             x += valueW + CellGap;
         }

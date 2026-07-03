@@ -1,8 +1,8 @@
 # LiveSplit SMW Counters
 
 A [LiveSplit](https://livesplit.org/) layout component that shows live *Super
-Mario World* counters — **deaths**, **level exits**, **jumps**, and **3-up
-moons** — by reading SNES WRAM from your running emulator.
+Mario World* counters — **deaths**, **level exits**, **jumps**, **3-up
+moons**, and **powerups** — by reading SNES WRAM from your running emulator.
 
 <!-- TODO: add a screenshot of the component in a LiveSplit layout. -->
 
@@ -30,9 +30,13 @@ moons** — by reading SNES WRAM from your running emulator.
 Open the component's settings (Edit Layout → double-click **SMW Counters**):
 
 - **Enable/disable** each counter independently (deaths and exits are on by
-  default).
+  default; jumps, moons, and powerups are off by default).
 - **3-up moon dedupe mode** — count **All** moons, or de-duplicate **Per level**
   or **Per room**.
+- **Powerups** — a low% helper: counts powerups collected, and turns the
+  layout's negative color while you're carrying powerups that haven't been
+  "banked" yet by a checkpoint or exit. Die before banking to discard them
+  without counting. Off by default.
 - **Label overrides** — replace a counter's default sprite icon with your own
   text label.
 - **Reset key** — a hotkey (keyboard or gamepad) that zeroes the counters.
