@@ -11,7 +11,7 @@ public class SmwCountersComponentFactory : IComponentFactory
 {
     public string ComponentName => "SMW Counters";
 
-    public string Description => "Counts SMW deaths, exits, jumps, and 3-up moons from your emulator.";
+    public string Description => "Counts SMW deaths, exits, jumps, 3-up moons, and powerups from your emulator.";
 
     public ComponentCategory Category => ComponentCategory.Other;
 

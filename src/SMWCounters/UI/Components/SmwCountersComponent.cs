@@ -214,6 +214,7 @@ public class SmwCountersComponent : IComponent
             // decision is final.
             cache[c.Id + ".label"] = overrideText ?? (c.DefaultIcon != null ? "<icon>" : c.DefaultLabel);
             cache[c.Id + ".value"] = value;
+            cache[c.Id + ".alert"] = c.ValueIsAlert;
         }
 
         if (invalidator != null && cache.HasChanged)
