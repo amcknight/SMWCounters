@@ -210,6 +210,16 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(lblStatus);
         y += 24;
 
+        var authorLabel = new Label
+        {
+            Text = "created by twitch.tv/mangort",
+            AutoSize = true,
+            ForeColor = System.Drawing.SystemColors.GrayText,
+        };
+        Controls.Add(authorLabel);
+        authorLabel.Location = new Point(480 - authorLabel.PreferredWidth - 10, y);
+        y += 20;
+
         Size = new Size(480, y + 10);
 
         RegisterHotKeys();

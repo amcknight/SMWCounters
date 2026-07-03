@@ -39,6 +39,7 @@ public class SmwCountersComponent : IComponent
     private readonly Dictionary<string, SimpleLabel> labelCells = new();
     private readonly Dictionary<string, SimpleLabel> valueCells = new();
     private readonly GraphicsCache cache = new();
+    private readonly System.Windows.Forms.ToolTip extrasToolTip = new();
 
     public SmwCountersComponentSettings Settings { get; }
 
@@ -149,16 +150,17 @@ public class SmwCountersComponent : IComponent
             };
             return (panel, refresh);
         }
-        if (counter is BankedCounter)
+        if (counter is PowerupCounter)
         {
             var chk = new CheckBox
             {
-                Text = "Bank on save",
+                Text = "Discard on death",
                 AutoSize = true,
                 Checked = Settings.IsBankOnSave(counter.Id),
                 Location = new Point(0, 4),
             };
             chk.CheckedChanged += (_, __) => Settings.SetBankOnSave(counter.Id, chk.Checked);
+            extrasToolTip.SetToolTip(chk, "Unbanked powerups (shown gold) are discarded if you die before a checkpoint or exit.");
             var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
             panel.Controls.Add(chk);
             Action refresh = () => chk.Checked = Settings.IsBankOnSave(counter.Id);
@@ -208,7 +210,7 @@ public class SmwCountersComponent : IComponent
         Settings.SetStatus("Counting · " + emu.Describe());
         foreach (ISmwCounter c in counters)
         {
-            if (c is BankedCounter bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }
+            if (c is PowerupCounter pc) { pc.Banked = Settings.IsBankOnSave(c.Id); }
             if (Settings.IsEnabled(c.Id)) { c.Poll(emu); }
         }
     }
