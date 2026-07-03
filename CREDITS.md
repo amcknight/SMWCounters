@@ -2,7 +2,7 @@
 
 ## Sprite assets
 
-The PNGs under `src/LiveSplit.SmwCounters/Assets/` are sprites and
+The PNGs under `src/SMWCounters/Assets/` are sprites and
 iconography from *Super Mario World* (Nintendo, 1990), used as
 fan-community speedrunning iconography for their respective counters:
 
@@ -22,5 +22,5 @@ belongs to that project.
 
 The source code in this repository is released under the MIT License (see
 `LICENSE`). That license covers the code only — the *Super Mario World* sprite
-PNGs under `src/LiveSplit.SmwCounters/Assets/` remain the intellectual property
+PNGs under `src/SMWCounters/Assets/` remain the intellectual property
 of Nintendo and are included solely as fan-community speedrunning iconography.

@@ -8,8 +8,8 @@ moons** — by reading SNES WRAM from your running emulator.
 
 ## Install
 
-1. Download `LiveSplit.SmwCounters.dll` from the
-   [latest release](https://github.com/amcknight/LiveSplit.SmwCounters/releases/latest).
+1. Download `SMWCounters.dll` from the
+   [latest release](https://github.com/amcknight/SMWCounters/releases/latest).
 2. Copy it into the `Components` folder inside your LiveSplit install
    (e.g. `LiveSplit/Components/`).
 3. Start LiveSplit → right-click → **Edit Layout…** → **+** → **Information →
@@ -45,10 +45,10 @@ Open the component's settings (Edit Layout → double-click **SMW Counters**):
 
 ```sh
 pwsh -File scripts/fetch-livesplit-core.ps1   # fetches lib/LiveSplit.Core.dll
-dotnet build src/LiveSplit.SmwCounters/LiveSplit.SmwCounters.csproj -c Release
+dotnet build src/SMWCounters/SMWCounters.csproj -c Release
 ```
 
-The built DLL lands under `artifacts/bin/LiveSplit.SmwCounters/`.
+The built DLL lands under `artifacts/bin/SMWCounters/`.
 
 **Inside the LiveSplit super-repo:** provide `LsSrcPath` (pointing at the
 LiveSplit `src` folder) and the project references `LiveSplit.Core` by source
