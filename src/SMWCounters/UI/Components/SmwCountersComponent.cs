@@ -83,13 +83,13 @@ public class SmwCountersComponent : IComponent
 
         // Wire up per-counter rows. Counter-specific extras live here so the
         // settings UserControl doesn't know about individual counter types.
-        var rows = new List<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue)>();
+        var rows = new List<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue, Action RefreshExtras)>();
         foreach (ISmwCounter c in counters)
         {
             ISmwCounter counter = c; // capture per-iteration
-            Control extras = BuildExtras(counter);
+            (Control extras, Action refreshExtras) = BuildExtras(counter);
             rows.Add((counter.Id, counter.DefaultLabel, extras, () => counter.Reset(),
-                      () => counter.Value, v => counter.SetValue(v)));
+                      () => counter.Value, v => counter.SetValue(v), refreshExtras));
         }
         Settings.BuildUi(rows);
 
@@ -109,7 +109,7 @@ public class SmwCountersComponent : IComponent
         }
     }
 
-    private Control BuildExtras(ISmwCounter counter)
+    private (Control control, Action refresh) BuildExtras(ISmwCounter counter)
     {
         if (counter is MoonCounter moon)
         {
@@ -141,7 +141,13 @@ public class SmwCountersComponent : IComponent
             panel.Controls.Add(rdoAll);
             panel.Controls.Add(rdoLevel);
             panel.Controls.Add(rdoRoom);
-            return panel;
+            Action refresh = () =>
+            {
+                rdoAll.Checked = moon.DedupeMode == MoonDedupeMode.All;
+                rdoLevel.Checked = moon.DedupeMode == MoonDedupeMode.PerLevel;
+                rdoRoom.Checked = moon.DedupeMode == MoonDedupeMode.PerRoom;
+            };
+            return (panel, refresh);
         }
         if (counter is BankedCounter)
         {
@@ -155,9 +161,10 @@ public class SmwCountersComponent : IComponent
             chk.CheckedChanged += (_, __) => Settings.SetBankOnSave(counter.Id, chk.Checked);
             var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
             panel.Controls.Add(chk);
-            return panel;
+            Action refresh = () => chk.Checked = Settings.IsBankOnSave(counter.Id);
+            return (panel, refresh);
         }
-        return null;
+        return (null, null);
     }
 
     private void Hook_KeyOrButtonPressed(object sender, KeyOrButton e)
@@ -189,16 +196,16 @@ public class SmwCountersComponent : IComponent
             {
                 if (Settings.IsEnabled(c.Id)) { c.Poll(inert); }
             }
-            Settings.SetStatus("timer not running — counting paused");
+            Settings.SetStatus("Paused · timer not running");
             return;
         }
 
         if (!emu.TryAttach())
         {
-            Settings.SetStatus(emu.LastError ?? "no emulator found");
+            Settings.SetStatus(emu.LastError ?? "No emulator found");
             return;
         }
-        Settings.SetStatus("attached — " + emu.Describe());
+        Settings.SetStatus("Counting · " + emu.Describe());
         foreach (ISmwCounter c in counters)
         {
             if (c is BankedCounter bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }

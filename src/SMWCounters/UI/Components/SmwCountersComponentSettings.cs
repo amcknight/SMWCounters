@@ -51,17 +51,18 @@ public class SmwCountersComponentSettings : UserControl
         public Func<int> GetValue;
         public Action<int> SetValue;
         public Control CounterSpecific;
+        public Action RefreshExtras;
     }
 
     // Component calls this once at construction with the list of known counters.
-    public void BuildUi(IReadOnlyList<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue)> counters)
+    public void BuildUi(IReadOnlyList<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue, Action RefreshExtras)> counters)
     {
         Controls.Clear();
         rows.Clear();
 
         int y = 10;
 
-        foreach ((string id, string defaultLabel, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue) in counters)
+        foreach ((string id, string defaultLabel, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue, Action refreshExtras) in counters)
         {
             var row = new CounterRow
             {
@@ -69,6 +70,7 @@ public class SmwCountersComponentSettings : UserControl
                 OnResetValue = resetValue,
                 GetValue = getValue,
                 SetValue = setValue,
+                RefreshExtras = refreshExtras,
             };
 
             row.Enable = new CheckBox
@@ -200,7 +202,7 @@ public class SmwCountersComponentSettings : UserControl
 
         lblStatus = new Label
         {
-            Text = "Emulator: (not polled yet)",
+            Text = "(not polled yet)",
             Location = new Point(10, y),
             AutoSize = true,
             ForeColor = System.Drawing.SystemColors.GrayText,
@@ -235,6 +237,7 @@ public class SmwCountersComponentSettings : UserControl
             row.Enable.Checked = IsEnabled(row.Id);
             row.ValueBox.Text = row.GetValue().ToString();
             SyncRowEnabled(row);
+            row.RefreshExtras?.Invoke();
         }
         if (txtReset != null) { txtReset.Text = FormatKey(ResetKey); }
         if (trkHeight != null) { trkHeight.Value = Math.Max(trkHeight.Minimum, Math.Min(trkHeight.Maximum, RowHeight)); }
@@ -335,7 +338,7 @@ public class SmwCountersComponentSettings : UserControl
     // Called by the component each poll to surface emulator attach state.
     public void SetStatus(string text)
     {
-        if (lblStatus != null) { lblStatus.Text = "Emulator: " + text; }
+        if (lblStatus != null) { lblStatus.Text = text; }
     }
 
     public bool IsEnabled(string counterId) => enabled.Contains(counterId);
