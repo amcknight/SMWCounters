@@ -7,6 +7,9 @@
     <AssemblyName>SMWCounters</AssemblyName>
 
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- So Visual Studio's fast up-to-date check doesn't skip the post-build
+         copy-to-Components step below (the CLI runs it every build regardless). -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     <Version>0.1.3</Version>
     <Company>Andrew McKnight</Company>
     <Product>LiveSplit SMW Counters</Product>
@@ -51,9 +54,13 @@
   </PropertyGroup>
 
   <Target Name="CopyToLiveSplitComponents" AfterTargets="Build" Condition="Exists('$(ComponentsPath)')">
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ComponentsPath)" />
-    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ComponentsPath)" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
-    <Message Importance="high" Text="SMWCounters: copied $(TargetFileName) -&gt; $(ComponentsPath)" />
+    <!-- ContinueOnError: a running LiveSplit locks the loaded DLL; warn (close it)
+         instead of failing the build. Touch: stamp the copy time so a rebuild
+         visibly updates the file (Copy otherwise preserves the source mtime). -->
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ComponentsPath)" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ComponentsPath)" Condition="Exists('$(TargetDir)$(TargetName).pdb')" ContinueOnError="true" />
+    <Touch Files="$(ComponentsPath)\$(TargetFileName)" ContinueOnError="true" />
+    <Message Importance="high" Text="SMWCounters: copied $(TargetFileName) to $(ComponentsPath)" />
   </Target>
 
   <ItemGroup>
