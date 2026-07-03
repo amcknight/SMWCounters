@@ -340,7 +340,7 @@ public class SmwCountersComponentSettings : UserControl
         ResetKey = rst != null && !string.IsNullOrEmpty(rst.InnerText) ? new KeyOrButton(rst.InnerText) : null;
         RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 50);
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
-        ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], false);
+        ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], true);
 
         enabled.Clear();
         XmlElement enabledNode = e["EnabledCounters"];
