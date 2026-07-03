@@ -41,6 +41,21 @@
     <PackageReference Include="PolySharp" Version="1.14.1" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- Dev convenience: after a build, drop the component DLL (+pdb) into the local
+       LiveSplit dev checkout's Components folder, mirroring how kaizosplits'
+       components output there, so a rebuild is picked up on the next LiveSplit
+       restart with no manual copy. Skipped when the folder is absent (CI, other
+       machines); override the destination with -p:ComponentsPath=... . -->
+  <PropertyGroup>
+    <ComponentsPath Condition="'$(ComponentsPath)' == ''">$(MSBuildProjectDirectory)\..\..\..\LiveSplit\bin\Components</ComponentsPath>
+  </PropertyGroup>
+
+  <Target Name="CopyToLiveSplitComponents" AfterTargets="Build" Condition="Exists('$(ComponentsPath)')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ComponentsPath)" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ComponentsPath)" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    <Message Importance="high" Text="SMWCounters: copied $(TargetFileName) -&gt; $(ComponentsPath)" />
+  </Target>
+
   <ItemGroup>
     <EmbeddedResource Include="Assets\death.png">
       <LogicalName>LiveSplit.SmwCounters.Assets.death.png</LogicalName>
