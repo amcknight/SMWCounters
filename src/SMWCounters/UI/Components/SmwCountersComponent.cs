@@ -33,7 +33,7 @@ public class SmwCountersComponent : IComponent
     }
 
     // All known counters, registered at construction. The Settings hold the
-    // user's enabled subset and label overrides.
+    // user's enabled subset.
     private readonly IReadOnlyList<ISmwCounter> counters;
 
     private readonly Dictionary<string, SimpleLabel> labelCells = new();
@@ -83,11 +83,13 @@ public class SmwCountersComponent : IComponent
 
         // Wire up per-counter rows. Counter-specific extras live here so the
         // settings UserControl doesn't know about individual counter types.
-        var rows = new List<(string Id, string DefaultLabel, Control Extras, Action ResetValue)>();
+        var rows = new List<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue)>();
         foreach (ISmwCounter c in counters)
         {
-            Control extras = BuildExtras(c);
-            rows.Add((c.Id, c.DefaultLabel, extras, () => c.Reset()));
+            ISmwCounter counter = c; // capture per-iteration
+            Control extras = BuildExtras(counter);
+            rows.Add((counter.Id, counter.DefaultLabel, extras, () => counter.Reset(),
+                      () => counter.Value, v => counter.SetValue(v)));
         }
         Settings.BuildUi(rows);
 
@@ -204,14 +206,6 @@ public class SmwCountersComponent : IComponent
         }
     }
 
-    // Returns the label-override text the user typed, or null when the row
-    // should draw the default icon instead.
-    private string OverrideTextOrNull(ISmwCounter c)
-    {
-        string overrideText = Settings.GetLabelOverride(c.Id);
-        return string.IsNullOrEmpty(overrideText) ? null : overrideText;
-    }
-
     public void Update(IInvalidator invalidator, LiveSplitState state, float width, float height, LayoutMode mode)
     {
         try { Settings.Hook?.Poll(); } catch { }
@@ -220,14 +214,9 @@ public class SmwCountersComponent : IComponent
         foreach (ISmwCounter c in counters)
         {
             if (!Settings.IsEnabled(c.Id)) { continue; }
-            string overrideText = OverrideTextOrNull(c);
             string value = c.Value.ToString();
             valueCells[c.Id].Text = value;
-            // Cache key is either the override text or "<icon>" so flipping
-            // between override-text and default-icon invalidates correctly.
-            // labelCells[c.Id].Text is set in DrawGeneral, where the icon-vs-text
-            // decision is final.
-            cache[c.Id + ".label"] = overrideText ?? (c.DefaultIcon != null ? "<icon>" : c.DefaultLabel);
+            cache[c.Id + ".label"] = c.DefaultIcon != null ? "<icon>" : c.DefaultLabel;
             cache[c.Id + ".value"] = value;
             cache[c.Id + ".alert"] = c.ValueIsAlert;
         }
@@ -254,18 +243,15 @@ public class SmwCountersComponent : IComponent
         int iconHeight = (int)Math.Round(0.85f * Settings.RowHeight);
 
         // Measure each enabled counter's cell width: label-slot + " " + value.
-        // Label slot is icon-aspect-scaled when defaulting, override-text width otherwise.
+        // Label slot is icon-aspect-scaled when the counter has an icon, else default-label text width.
         var enabled = counters.Where(c => Settings.IsEnabled(c.Id)).ToList();
         float totalWidth = 0f;
         var cellWidths = new Dictionary<string, (float labelW, float valueW)>();
         foreach (ISmwCounter c in enabled)
         {
-            string overrideText = OverrideTextOrNull(c);
-            float labelW = overrideText != null
-                ? g.MeasureString(overrideText, font).Width
-                : c.DefaultIcon != null
-                    ? IconWidthFor(c.DefaultIcon, iconHeight)
-                    : g.MeasureString(c.DefaultLabel, font).Width;
+            float labelW = c.DefaultIcon != null
+                ? IconWidthFor(c.DefaultIcon, iconHeight)
+                : g.MeasureString(c.DefaultLabel, font).Width;
             float valueW = g.MeasureString(c.Value.ToString("0"), font).Width;
             cellWidths[c.Id] = (labelW, valueW);
             if (totalWidth > 0) { totalWidth += CellGap; }
@@ -283,15 +269,14 @@ public class SmwCountersComponent : IComponent
         foreach (ISmwCounter c in enabled)
         {
             (float labelW, float valueW) = cellWidths[c.Id];
-            string overrideText = OverrideTextOrNull(c);
 
-            if (overrideText == null && c.DefaultIcon != null)
+            if (c.DefaultIcon != null)
             {
                 DrawIcon(g, c.DefaultIcon, x, height, labelW, iconHeight);
             }
-            else if (overrideText != null || c.DefaultIcon == null)
+            else
             {
-                labelCells[c.Id].Text = overrideText ?? c.DefaultLabel;
+                labelCells[c.Id].Text = c.DefaultLabel;
                 ConfigureLabel(labelCells[c.Id], font, textColor, StringAlignment.Near, x, labelW, height);
                 labelCells[c.Id].Draw(g);
             }
