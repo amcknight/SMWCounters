@@ -48,4 +48,19 @@ public class MoonCounterTests
         Poll(c, m, 1, 4);  // now a real collection
         Assert.Equal(1, c.Value);
     }
+
+    [Fact]
+    public void LeavingLevel_ClearsBaseline_NoCrossLevelSpuriousCount()
+    {
+        var c = new MoonCounter { DedupeMode = MoonDedupeMode.All };
+        var m = new FakeSnesMemory();
+        Poll(c, m, 1, 0);  // in level; baseline
+        Poll(c, m, 1, 2);  // real collection
+        Assert.Equal(1, c.Value);
+        Poll(c, m, 0, 2);  // left level; gate clears the stale baseline
+        Poll(c, m, 1, 5);  // first in-level sample after re-entry only re-baselines
+        Assert.Equal(1, c.Value);
+        Poll(c, m, 1, 6);  // now a real collection in the new level
+        Assert.Equal(2, c.Value);
+    }
 }
