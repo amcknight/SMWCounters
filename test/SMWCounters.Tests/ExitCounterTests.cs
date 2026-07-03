@@ -79,10 +79,11 @@ public class ExitCounterTests
     {
         var c = new ExitCounter();
         var m = new FakeSnesMemory();
-        Poll(c, m, 0, 0, 0, 0, 0);
-        m.SetByte(0x0DD5, 4);         // old signal; must be ignored now
-        c.Poll(m);
-        Assert.Equal(0, c.Value);
+        m.SetByte(0x0DD5, 0);
+        Poll(c, m, 0, 0, 0, 0, 0);    // baseline, exitMode=0
+        m.SetByte(0x0DD5, 4);
+        Poll(c, m, 0, 0, 0, 0, 0);    // exitMode 0->4 edge; no finish event
+        Assert.Equal(0, c.Value);     // old signal must be ignored
     }
 
     [Fact]
