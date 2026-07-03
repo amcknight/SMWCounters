@@ -21,6 +21,11 @@ internal abstract class BankedCounter : ISmwCounter
     protected int total;
     protected int saved;
 
+    // When false the counter is a plain permanent tally: collects advance saved
+    // with total (no alert), and die-to-discard is a no-op. Driven by the
+    // per-counter "Bank on save" setting.
+    public bool Banked { get; set; } = true;
+
     public abstract string Id { get; }
     public abstract Image DefaultIcon { get; }
     public abstract string DefaultLabel { get; }
@@ -55,7 +60,7 @@ internal abstract class BankedCounter : ISmwCounter
         }
 
         if (DetectDeath(memory)) { total = saved; }
-        if (DetectCollect(memory)) { total++; }
+        if (DetectCollect(memory)) { total++; if (!Banked) { saved = total; } }
         if (DetectBank(memory)) { saved = total; }
     }
 
