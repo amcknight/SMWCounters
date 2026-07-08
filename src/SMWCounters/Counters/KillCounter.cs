@@ -20,7 +20,9 @@ namespace LiveSplit.SmwCounters.Counters;
 // Rule: count once per slot when the previous sample was NOT in the dead set and
 // not empty ($00), and the current sample IS in the dead set. Treating the dead
 // set as one absorbing region means shuffling within it (e.g. 04 -> 02) does not
-// double-count, and offscreening (status -> 00) is naturally excluded.
+// double-count, and offscreening (status -> 00) is naturally excluded. Only $00
+// is excluded as a "from" state; $01 (slot taken, uninitialized) is intentionally
+// countable, though a $01 -> dead transition is near-impossible in practice.
 //
 // v1 deliberately does no sprite-ID filtering: a P-switch press can register as
 // 03 and will count. This is an observation instrument; filtering (if any) waits

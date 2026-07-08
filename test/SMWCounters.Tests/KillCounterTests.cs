@@ -1,3 +1,5 @@
+using System.Xml;
+
 using LiveSplit.SmwCounters.Counters;
 using Xunit;
 
@@ -98,6 +100,39 @@ public class KillCounterTests
         m.Attached = false; c.Poll(m);  // detach clears edges
         m.Attached = true;
         PollSlot0(c, m, Spinjump);       // prev cleared: no count
+        Assert.Equal(0, c.Value);
+    }
+
+    [Fact]
+    public void SaveLoad_RoundTripsValueUnderKillsKey()
+    {
+        var c = new KillCounter();
+        c.SetValue(7);
+        var doc = new XmlDocument();
+        var parent = doc.CreateElement("kills");
+        c.SaveState(doc, parent);
+
+        // Locks the stable serialization element name "Kills".
+        Assert.Equal("7", parent["Kills"].InnerText);
+
+        var restored = new KillCounter();
+        restored.LoadState(parent);
+        Assert.Equal(7, restored.Value);
+    }
+
+    [Fact]
+    public void Reset_ZeroesValueAndClearsEdges()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive);
+        PollSlot0(c, m, Spinjump);       // 08 -> 04 : kill
+        Assert.Equal(1, c.Value);
+
+        c.Reset();
+        Assert.Equal(0, c.Value);
+
+        // Edges were cleared: the pre-reset live sample can't bridge to a kill.
+        PollSlot0(c, m, Spinjump);       // no prior sample: sets prev, no count
         Assert.Equal(0, c.Value);
     }
 }
