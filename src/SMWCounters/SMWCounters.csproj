@@ -78,6 +78,9 @@
     <EmbeddedResource Include="Assets\mushroom.png">
       <LogicalName>LiveSplit.SmwCounters.Assets.mushroom.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Assets\kill.png">
+      <LogicalName>LiveSplit.SmwCounters.Assets.kill.png</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
