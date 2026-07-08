@@ -9,6 +9,7 @@ using System.Xml;
 using LiveSplit.Model;
 using LiveSplit.Model.Input;
 using LiveSplit.SmwCounters.Counters;
+using LiveSplit.SmwCounters.Diagnostics;
 using LiveSplit.SmwCounters.Snes;
 
 namespace LiveSplit.UI.Components;
@@ -20,6 +21,7 @@ public class SmwCountersComponent : IComponent
     private readonly LiveSplitState state;
     private readonly Timer pollTimer;
     private readonly SnesEmu emu = new();
+    private readonly DebugLogger debugLog = new();
 
     // Shared "always detached" memory used to flush per-counter edge state
     // when polling is gated off (timer not running). Re-uses each counter's
@@ -176,20 +178,33 @@ public class SmwCountersComponent : IComponent
             {
                 if (Settings.IsEnabled(c.Id)) { c.Poll(inert); }
             }
+            debugLog.Idle();
             Settings.SetStatus("Paused · timer not running");
             return;
         }
 
         if (!emu.TryAttach())
         {
+            debugLog.Idle();
             Settings.SetStatus(emu.LastError ?? "No emulator found");
             return;
         }
-        Settings.SetStatus("Counting · " + emu.Describe());
         foreach (ISmwCounter c in counters)
         {
             if (c is PowerupCounter pc) { pc.Banked = Settings.IsBankOnSave(c.Id); }
             if (Settings.IsEnabled(c.Id)) { c.Poll(emu); }
+        }
+
+        if (Settings.DebugLog)
+        {
+            debugLog.Poll(emu, counters, id => Settings.IsEnabled(id),
+                          state.CurrentPhase.ToString(), emu.Describe());
+            Settings.SetStatus("Counting · " + emu.Describe() + " · debug log → " + debugLog.LogPath);
+        }
+        else
+        {
+            debugLog.Close();
+            Settings.SetStatus("Counting · " + emu.Describe());
         }
     }
 
@@ -360,6 +375,7 @@ public class SmwCountersComponent : IComponent
 
     public void Dispose()
     {
+        debugLog.Close();
         pollTimer?.Dispose();
         extrasToolTip?.Dispose();
         state.OnReset -= State_OnReset;

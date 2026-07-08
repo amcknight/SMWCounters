@@ -24,6 +24,7 @@ public class SmwCountersComponentSettings : UserControl
     public int RowHeight { get; set; } = 45;
     public HAlignment Alignment { get; set; } = HAlignment.Center;
     public bool ResetOnSplitsReset { get; set; } = true;
+    public bool DebugLog { get; set; } = false;
 
     public SmwCountersComponentSettings(bool allowGamepads)
     {
@@ -39,6 +40,7 @@ public class SmwCountersComponentSettings : UserControl
     private RadioButton rdoCenter;
     private RadioButton rdoRight;
     private CheckBox chkResetOnSplitsReset;
+    private CheckBox chkDebugLog;
     private Label lblStatus;
 
     private sealed class CounterRow
@@ -201,6 +203,17 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(chkResetOnSplitsReset);
         y += 28;
 
+        chkDebugLog = new CheckBox
+        {
+            Text = "Debug: log counter + sprite events to file",
+            Location = new Point(10, y),
+            AutoSize = true,
+            Checked = DebugLog,
+        };
+        chkDebugLog.CheckedChanged += (_, __) => DebugLog = chkDebugLog.Checked;
+        Controls.Add(chkDebugLog);
+        y += 28;
+
         lblStatus = new Label
         {
             Text = "(not polled yet)",
@@ -268,6 +281,7 @@ public class SmwCountersComponentSettings : UserControl
             rdoRight.Checked = Alignment == HAlignment.Right;
         }
         if (chkResetOnSplitsReset != null) { chkResetOnSplitsReset.Checked = ResetOnSplitsReset; }
+        if (chkDebugLog != null) { chkDebugLog.Checked = DebugLog; }
         RegisterHotKeys();
     }
 
@@ -409,6 +423,7 @@ public class SmwCountersComponentSettings : UserControl
         RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 45);
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
         ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], true);
+        DebugLog = SettingsHelper.ParseBool(e["DebugLog"], false);
 
         enabled.Clear();
         XmlElement enabledNode = e["EnabledCounters"];
@@ -442,6 +457,7 @@ public class SmwCountersComponentSettings : UserControl
         hash ^= SettingsHelper.CreateSetting(document, parent, "RowHeight", RowHeight);
         hash ^= SettingsHelper.CreateSetting(document, parent, "Alignment", Alignment.ToString());
         hash ^= SettingsHelper.CreateSetting(document, parent, "ResetOnSplitsReset", ResetOnSplitsReset);
+        hash ^= SettingsHelper.CreateSetting(document, parent, "DebugLog", DebugLog);
 
         if (document != null && parent != null)
         {

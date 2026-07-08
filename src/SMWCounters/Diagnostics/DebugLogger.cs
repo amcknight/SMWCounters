@@ -1,0 +1,138 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+using LiveSplit.SmwCounters.Counters;
+using LiveSplit.SmwCounters.Snes;
+
+namespace LiveSplit.SmwCounters.Diagnostics;
+
+// Opt-in debug instrumentation for investigating counter behavior. When enabled
+// (per the "Debug log" setting), each poll appends event lines to a log file:
+//
+//   CTR <id> <old>-><new> | phase=.. <emu> | mode=.. inLvl=.. anim=.. fanfare=..
+//       io=.. boss=.. exits=.. moon=..        (a counter incremented; context is
+//                                              the WRAM the counters key off of)
+//   SPR slot<n> #<spriteNum> <old>-><new> | mode=..
+//                                             (a sprite slot's $14C8 status changed)
+//
+// The SPR trace answers questions like "what status does a fireballed enemy pass
+// through?" and "does the coin reuse the enemy's slot?"; the CTR line answers
+// "what game mode was active when the Exit counter incremented?".
+//
+// All file I/O is best-effort and swallows exceptions so logging can never
+// disrupt polling. Edge state clears on Idle()/Close() so a pause or detach
+// doesn't bridge a stale sample to a fresh one and fabricate a transition.
+internal sealed class DebugLogger
+{
+    // Context addresses the built-in counters key off of.
+    private const int GameMode = 0x0100;   // $14 = level main
+    private const int InLevel = 0x1935;    // 1 = in a level
+    private const int PlayerAnim = 0x0071; // $09 = dying (deaths)
+    private const int Fanfare = 0x0906;    // exit: level-clear fanfare
+    private const int Io = 0x1DFB;         // exit: 3=orb 4=goal 7=key
+    private const int BossDefeat = 0x13C6; // exit: boss defeated
+    private const int ExitsSaved = 0x1F2E; // exit: saved exit count
+    private const int MoonByte = 0x13C5;   // moons collected this scene
+
+    // Sprite tables.
+    private const int SpriteStatusBase = 0x14C8; // per-slot status ($14C8..$14D3)
+    private const int SpriteNumberBase = 0x009E; // per-slot sprite id ($9E..$A9)
+    private const int SlotCount = 12;
+
+    private readonly string logPath;
+    private readonly PreviousByte[] prevStatus;
+    private readonly Dictionary<string, int> lastValue = new();
+    private StreamWriter writer;
+
+    public string LogPath => logPath;
+
+    public DebugLogger()
+    {
+        string dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SMWCounters");
+        logPath = Path.Combine(dir, "counters-debug.log");
+
+        prevStatus = new PreviousByte[SlotCount];
+        for (int i = 0; i < SlotCount; i++) { prevStatus[i] = new PreviousByte(); }
+    }
+
+    // Log this poll's counter increments and sprite-status transitions.
+    public void Poll(ISnesMemory mem, IReadOnlyList<ISmwCounter> counters,
+                     Func<string, bool> isEnabled, string phase, string emuDesc)
+    {
+        LogCounterChanges(mem, counters, isEnabled, phase, emuDesc);
+        LogSpriteTransitions(mem);
+    }
+
+    // Clear edge-detection state without closing the file (pause / detach).
+    public void Idle()
+    {
+        lastValue.Clear();
+        for (int i = 0; i < SlotCount; i++) { prevStatus[i].Clear(); }
+    }
+
+    // Clear state and release the file (logging disabled / component disposed).
+    public void Close()
+    {
+        Idle();
+        try { writer?.Dispose(); } catch { }
+        writer = null;
+    }
+
+    private void LogCounterChanges(ISnesMemory mem, IReadOnlyList<ISmwCounter> counters,
+                                   Func<string, bool> isEnabled, string phase, string emuDesc)
+    {
+        foreach (ISmwCounter c in counters)
+        {
+            if (!isEnabled(c.Id)) { continue; }
+            int cur = c.Value;
+            bool had = lastValue.TryGetValue(c.Id, out int prev);
+            lastValue[c.Id] = cur;
+            if (had && cur > prev)
+            {
+                string ctx = $"mode={Hex(mem, GameMode)} inLvl={Hex(mem, InLevel)} "
+                    + $"anim={Hex(mem, PlayerAnim)} fanfare={Hex(mem, Fanfare)} "
+                    + $"io={Hex(mem, Io)} boss={Hex(mem, BossDefeat)} "
+                    + $"exits={Hex(mem, ExitsSaved)} moon={Hex(mem, MoonByte)}";
+                Write($"CTR {c.Id} {prev}->{cur} | phase={phase} {emuDesc} | {ctx}");
+            }
+        }
+    }
+
+    private void LogSpriteTransitions(ISnesMemory mem)
+    {
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (!mem.ReadWramByte(SpriteStatusBase + i, out byte status))
+            {
+                prevStatus[i].Clear();
+                continue;
+            }
+            if (prevStatus[i].HasPrevious && prevStatus[i].Value != status)
+            {
+                Write($"SPR slot{i} #{Hex(mem, SpriteNumberBase + i)} "
+                    + $"{prevStatus[i].Value:X2}->{status:X2} | mode={Hex(mem, GameMode)}");
+            }
+            prevStatus[i].Set(status);
+        }
+    }
+
+    private static string Hex(ISnesMemory mem, int offset)
+        => mem.ReadWramByte(offset, out byte b) ? b.ToString("X2") : "??";
+
+    private void Write(string line)
+    {
+        try
+        {
+            if (writer == null)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(logPath));
+                writer = new StreamWriter(logPath, append: true) { AutoFlush = true };
+            }
+            writer.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff") + " " + line);
+        }
+        catch { /* logging is best-effort; never disrupt polling */ }
+    }
+}
