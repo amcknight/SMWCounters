@@ -50,8 +50,14 @@ handles the main worries for free:
 **In:** dead-set `= {02,03,04,05}` only. Neutral tally display. `kill.png` icon
 (a ghost sprite, supplied during implementation). Default disabled.
 
-**Out (deferred; observation decides):** counting `06`/`0C` (goal-tape) and `07`
-(Yoshi mouth); Tally/Passivist style toggle; per-death-state checkboxes; any
+**Update (post-v1, from live observation):** `07` (Yoshi's mouth / eaten) is now
+counted — eating a mole should register as a kill. `06`/`0C` (goal-tape) remain
+excluded.
+
+**Out (deferred; observation decides):** counting `06`/`0C` (goal-tape);
+a "doesn't count as kill" sprite-ID exclusion list with a smart default (e.g. to
+drop the P-switch, which registers when it puffs to smoke); Tally/Passivist style
+toggle; per-death-state checkboxes; any
 sprite-ID / "is it really an enemy" filtering (e.g. P-switch exclusion);
 Destruction concept; final name.
 
@@ -124,7 +130,8 @@ TDD-first:
    not re-count.
 2. Within-dead-set shuffle (`04` → `02`) does not double-count.
 3. Offscreen (`08` → `00`) does not count.
-4. Goal-tape (`08` → `06`) and Yoshi (`08` → `07`) do not count.
+4. Goal-tape (`08` → `06`, `08` → `0C`) does not count. (Yoshi `08` → `07` now
+   counts — see the post-v1 update above.)
 5. Entry-from-empty (`00` → `02`) does not count.
 6. Multiple slots entering the dead-set in one tick each count.
 7. Game mode `!= 0x14` gates counting off and clears edges; a subsequent

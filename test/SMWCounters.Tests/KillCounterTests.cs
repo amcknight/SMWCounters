@@ -8,7 +8,7 @@ namespace SMWCounters.Tests;
 public class KillCounterTests
 {
     private const int GameMode = 0x0100, StatusBase = 0x14C8;
-    private const byte Level = 0x14, Alive = 0x08, Spinjump = 0x04, Falling = 0x02;
+    private const byte Level = 0x14, Alive = 0x08, Spinjump = 0x04, Falling = 0x02, Yoshi = 0x07;
 
     // Poll driving only sprite slot 0 (other slots left unset => read fails =>
     // that slot is cleared/skipped, so it never contributes a kill).
@@ -51,7 +51,6 @@ public class KillCounterTests
 
     [Theory]
     [InlineData((byte)0x06)]   // goal-tape coin
-    [InlineData((byte)0x07)]   // Yoshi's mouth
     [InlineData((byte)0x0C)]   // goal-tape powerup
     public void NonDeadTransition_DoesNotCount(byte target)
     {
@@ -59,6 +58,15 @@ public class KillCounterTests
         PollSlot0(c, m, Alive);
         PollSlot0(c, m, target);
         Assert.Equal(0, c.Value);
+    }
+
+    [Fact]
+    public void EatenByYoshi_Counts()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive);
+        PollSlot0(c, m, Yoshi);      // 08 -> 07 : eaten, counts
+        Assert.Equal(1, c.Value);
     }
 
     [Fact]

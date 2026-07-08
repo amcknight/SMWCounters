@@ -15,7 +15,7 @@ namespace LiveSplit.SmwCounters.Counters;
 //                             doesn't count.
 //   $7E:14C8[i] (SpriteStatus): per-slot status. Dead set = 02 (killed, falling
 //                             off screen), 03 (smushed), 04 (spinjumped),
-//                             05 (lava/mud).
+//                             05 (lava/mud), 07 (inside Yoshi's mouth / eaten).
 //
 // Rule: count once per slot when the previous sample was NOT in the dead set and
 // not empty ($00), and the current sample IS in the dead set. Treating the dead
@@ -24,10 +24,14 @@ namespace LiveSplit.SmwCounters.Counters;
 // is excluded as a "from" state; $01 (slot taken, uninitialized) is intentionally
 // countable, though a $01 -> dead transition is near-impossible in practice.
 //
+// Yoshi's mouth (07) is in the dead set so eaten enemies count. Caveat: an enemy
+// Yoshi spits back out re-enters the dead set only if eaten again, but a berry or
+// an enemy that is eaten then spat could still register on the 08 -> 07 entry.
+//
 // v1 deliberately does no sprite-ID filtering: a P-switch press can register as
-// 03 and will count. This is an observation instrument; filtering (if any) waits
-// on real-play data. Goal-tape conversions (06/0C) and Yoshi's mouth (07) are
-// excluded only by virtue of not being in the dead set.
+// 03 (observed: when it puffs to smoke) and will count. This is an observation
+// instrument; filtering (if any) waits on real-play data. Goal-tape conversions
+// (06/0C, a mass end-of-level conversion) are excluded by not being in the set.
 internal sealed class KillCounter : ISmwCounter
 {
     private const int GameModeOffset = 0x0100;
@@ -93,7 +97,7 @@ internal sealed class KillCounter : ISmwCounter
         }
     }
 
-    private static bool IsDead(byte status) => status >= 0x02 && status <= 0x05;
+    private static bool IsDead(byte status) => (status >= 0x02 && status <= 0x05) || status == 0x07;
 
     private void ClearAll()
     {
