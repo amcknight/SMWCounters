@@ -13,9 +13,10 @@ namespace LiveSplit.SmwCounters.Counters;
 //   $7E:0100 (GameMode):      $14 = level main routine. Gate to this so
 //                             overworld / load-time garbage in the status table
 //                             doesn't count.
-//   $7E:14C8[i] (SpriteStatus): per-slot status. Dead set = 02 (killed, falling
-//                             off screen), 03 (smushed), 04 (spinjumped),
-//                             05 (lava/mud), 07 (inside Yoshi's mouth / eaten).
+//   $7E:14C8[i] (SpriteStatus): per-slot status. Dead set = the whole 02..07
+//                             range: 02 (killed, falling off screen),
+//                             03 (smushed), 04 (spinjumped), 05 (lava/mud),
+//                             06 (goal-tape coin), 07 (inside Yoshi's mouth).
 //
 // Rule: count once per slot when the previous sample was NOT in the dead set and
 // not empty ($00), and the current sample IS in the dead set. Treating the dead
@@ -24,14 +25,17 @@ namespace LiveSplit.SmwCounters.Counters;
 // is excluded as a "from" state; $01 (slot taken, uninitialized) is intentionally
 // countable, though a $01 -> dead transition is near-impossible in practice.
 //
-// Yoshi's mouth (07) is in the dead set so eaten enemies count. Caveat: an enemy
-// Yoshi spits back out re-enters the dead set only if eaten again, but a berry or
-// an enemy that is eaten then spat could still register on the 08 -> 07 entry.
+// The set is the uniform 02..07 range (chosen for simplicity). Consequences:
+//   - Yoshi's mouth (07) counts, so eaten enemies register. A berry, or an enemy
+//     spat out then re-eaten, can register on the 08 -> 07 entry.
+//   - Goal-tape coin (06) counts, so crossing the goal registers a BURST of kills
+//     (one per on-screen sprite the tape converts). 0C (goal-tape -> powerup) is
+//     just outside the range, so that path is asymmetric and not counted.
 //
-// v1 deliberately does no sprite-ID filtering: a P-switch press can register as
-// 03 (observed: when it puffs to smoke) and will count. This is an observation
-// instrument; filtering (if any) waits on real-play data. Goal-tape conversions
-// (06/0C, a mass end-of-level conversion) are excluded by not being in the set.
+// v1 deliberately does no sprite-ID filtering: a P-switch press can register
+// (observed: when it puffs to smoke) and will count. This is an observation
+// instrument; a "doesn't count as a kill" sprite list (P-switch, berry, ...)
+// waits on real-play data.
 internal sealed class KillCounter : ISmwCounter
 {
     private const int GameModeOffset = 0x0100;
@@ -97,7 +101,7 @@ internal sealed class KillCounter : ISmwCounter
         }
     }
 
-    private static bool IsDead(byte status) => (status >= 0x02 && status <= 0x05) || status == 0x07;
+    private static bool IsDead(byte status) => status >= 0x02 && status <= 0x07;
 
     private void ClearAll()
     {
