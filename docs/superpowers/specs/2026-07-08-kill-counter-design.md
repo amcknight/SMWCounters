@@ -47,13 +47,13 @@ handles the main worries for free:
 
 ## v1 scope
 
-**In:** dead-set `= {02,03,04,05}` only. Neutral tally display. Text label
-(no icon yet). Default disabled.
+**In:** dead-set `= {02,03,04,05}` only. Neutral tally display. `kill.png` icon
+(a ghost sprite, supplied during implementation). Default disabled.
 
 **Out (deferred; observation decides):** counting `06`/`0C` (goal-tape) and `07`
 (Yoshi mouth); Tally/Passivist style toggle; per-death-state checkboxes; any
 sprite-ID / "is it really an enemy" filtering (e.g. P-switch exclusion);
-Destruction concept; final name and icon.
+Destruction concept; final name.
 
 Deliberately **no filtering** in v1. Pressing a P-switch can itself register as
 `03`, and other sprites may surprise us — but hardcoding a sprite-ID blacklist
@@ -90,9 +90,10 @@ Identity / display:
 
 - `Id => "kills"` (stable serialization key).
 - `DefaultLabel => "Kills"`.
-- `DefaultIcon => null` (both the `Update` cache path and `DrawGeneral` already
-  fall back to drawing `DefaultLabel` text when the icon is null). A Mario/enemy
-  icon will be added later.
+- `DefaultIcon => icon`, loading embedded `Assets/kill.png` via
+  `IconLoader.Load("LiveSplit.SmwCounters.Assets.kill.png")`, like the other
+  counters. (The interface and both draw paths also support a null icon with a
+  text-label fallback, if the icon is ever removed.)
 - `ValueIsAlert => false` (neutral number, like Jumps).
 - `SetValue` / `Value` / `Reset` as in `JumpCounter`; `Reset` also clears all 12
   `PreviousByte`.

@@ -29,7 +29,7 @@
 
 **Interfaces:**
 - Consumes: `ISmwCounter` (interface), `ISnesMemory.ReadWramByte(int, out byte)` / `IsAttached`, `PreviousByte` (`.HasPrevious`, `.Value`, `.Set(byte)`, `.Clear()`), `LiveSplit.UI.SettingsHelper.CreateSetting` / `ParseInt`, `SMWCounters.Tests.FakeSnesMemory` (`.Attached`, `.SetByte(int, byte)`).
-- Produces: `public sealed class KillCounter : ISmwCounter` with `Id => "kills"`, `DefaultLabel => "Kills"`, `DefaultIcon => null`, `ValueIsAlert => false`, `int Value`, `void SetValue(int)`, `void Reset()`, `void Poll(ISnesMemory)`, `void SaveState(XmlDocument, XmlElement)`, `void LoadState(XmlElement)`.
+- Produces: `public sealed class KillCounter : ISmwCounter` with `Id => "kills"`, `DefaultLabel => "Kills"`, `DefaultIcon => icon` (embedded `Assets/kill.png`), `ValueIsAlert => false`, `int Value`, `void SetValue(int)`, `void Reset()`, `void Poll(ISnesMemory)`, `void SaveState(XmlDocument, XmlElement)`, `void LoadState(XmlElement)`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -186,6 +186,8 @@ internal sealed class KillCounter : ISmwCounter
     private const int SpriteStatusBase = 0x14C8;
     private const int SlotCount = 12;
 
+    private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.kill.png");
+
     private readonly PreviousByte[] previousStatus;
 
     public KillCounter()
@@ -195,7 +197,7 @@ internal sealed class KillCounter : ISmwCounter
     }
 
     public string Id => "kills";
-    public Image DefaultIcon => null;
+    public Image DefaultIcon => icon;
     public string DefaultLabel => "Kills";
 
     public int Value { get; private set; }
@@ -330,10 +332,10 @@ git commit -m "feat: register KillCounter (default-off Kills row)"
 - Core mechanic (live→dead-set, per-slot, absorbing region) → Task 1 impl + tests 1,2,3,5.
 - Dead-set `{02,03,04,05}` only; `06/07/0C` excluded → Task 1 `IsDead` + test `NonDeadTransition_DoesNotCount`.
 - In-level gate `$0100==0x14`, clear on gate-off/detach → Task 1 `Poll` + tests `GameModeGate...`, `Detach...`.
-- Neutral display, text label, `Id="kills"`, default-off → Task 1 identity members + Task 2 registration (absent from enabled set).
+- Neutral display, `kill.png` icon, `Id="kills"`, default-off → Task 1 identity members + Task 2 registration (absent from enabled set).
 - Persistence `<Kills>` → Task 1 `SaveState`/`LoadState`.
 - Wiring inherits settings/poll/reset → Task 2.
-- Deferred items (styles, checkboxes, filtering, icon, `06/07`) → intentionally not in plan; documented in spec.
+- Deferred items (styles, checkboxes, filtering, `06/07`) → intentionally not in plan; documented in spec.
 
 **Placeholder scan:** none — all steps contain full code/commands/expected output.
 

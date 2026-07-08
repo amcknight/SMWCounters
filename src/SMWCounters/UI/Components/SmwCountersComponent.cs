@@ -70,6 +70,7 @@ public class SmwCountersComponent : IComponent
             moon,
             new JumpCounter(),
             new PowerupCounter(),
+            new KillCounter(),
         };
 
         foreach (ISmwCounter c in counters)
