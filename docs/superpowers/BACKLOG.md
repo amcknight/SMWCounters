@@ -7,26 +7,20 @@ first within each group.
 ## Architecture / blockers for 1.0
 
 - **SNESOffset detection.** The offset/attach tables are ported verbatim from
-  kaizosplits and duplicated here. A shared, self-updating SNES memory/offset
-  layer (detect emulator + core + version robustly, one source of truth across
-  projects) is the gate for calling this **1.0**; until then we stay on 0.x.
-  This is the main reason 1.0 is deferred.
-- **Mesen support.** Mesen (Mesen2, process `Mesen.exe`) is **not** currently
-  supported: it is absent from `Offsets.KnownProcessNames`
-  (`retroarch`/`snes9x`/`snes9x-x64`/`snes9x-rr`/`bsnes`/`higan`/`emuhawk`), and
-  there are no WRAM offsets for it, so the component reports "no emulator found"
-  and never attaches. Adding it means locating Mesen's SNES WRAM base in its
-  process — reverse-engineering that is **build/version-specific** and cannot be
-  derived statically; it needs hands-on work against a running Mesen (Cheat
-  Engine pointer scan, or correlating an address via Mesen's built-in memory
-  viewer/debugger). Two implementation shapes: (a) the existing kaizosplits-style
-  per-version tables (module-size→version map in `Offsets.Version` + a WRAM base
-  as an absolute `Offsets.Mem` entry or a `DeepPointer` chain in `Offsets.MemPtr`,
-  wired through `SnesEmu.ResolveWramBase`); or (b) a **signature scan**
-  (`LiveSplit.ComponentUtil.SignatureScanner`) to find WRAM by pattern, which is
-  version-robust and would double as a first step toward the self-updating SNES
-  layer above. Prefer (b) if a stable signature can be found. Needs a live Mesen
-  to research and verify.
+  kaizosplits and duplicated here. **Plan:** incorporate a generic `SNES.dll`
+  memory/offset layer from another project — one source of truth that detects
+  emulator + core + version robustly and finds WRAM across all emulators. This
+  is the gate for calling this **1.0**; until then we stay on 0.x, and it is the
+  main reason 1.0 is deferred. Adopting it also subsumes the whole
+  `Offsets`/`SnesEmu` attach path here.
+- **Mesen support comes via the generic `SNES.dll`.** Mesen (Mesen2, process
+  `Mesen.exe`) is not supported today — it is absent from
+  `Offsets.KnownProcessNames`
+  (`retroarch`/`snes9x`/`snes9x-x64`/`snes9x-rr`/`bsnes`/`higan`/`emuhawk`) and
+  has no WRAM offsets, so the component reports "no emulator found" and never
+  attaches. This is **not** a standalone offset-research task in this repo: Mesen
+  (and any other emulator) is expected to work once the generic `SNES.dll` layer
+  above is adopted. Do not hand-roll per-version Mesen offsets here.
 
 ## Counting semantics (SMW judgment calls)
 
