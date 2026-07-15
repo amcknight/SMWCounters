@@ -41,9 +41,14 @@ instrumentation. Backlogged as a research item.
   eating a live enemy. Only the sprite ID separates "ate a creature" from
   "picked up an item". (Also confirmed: Yoshi *can* swallow a springboard —
   two `07->00` events observed.)
-- **Sampling misses one-frame states**: instantly-swallowed enemies
-  (shell-less koopas, spinies, eaten koopalings) never show `07` to our poll,
-  so Yoshi insta-eats are invisible. Accepted limitation.
+- **Sampling misses one-frame states**: the component polls WRAM from outside
+  the emulator on a ~15 ms Forms timer (observed effective gaps 20-50 ms)
+  against a ~16.7 ms game frame — reads are unsynchronized snapshots, and
+  frame-perfect visibility would need emulator-side hooks we don't have. Any
+  state we key off must persist for several frames. Consequence: instantly-
+  swallowed enemies (shell-less koopas, spinies, eaten koopalings) never show
+  `07` to our poll — status alone cannot see insta-eats, motivating the
+  Yoshi-state research below.
 
 ## Design priority
 
@@ -69,9 +74,13 @@ near-perfect Kills mode, not exhaustive coverage.
    items like the springboard idle at `08` too.
 5. **Swallowing an item** (`07->00` after a non-creature mouth entry) counts
    for Destruction only; it is never a Kill.
-6. **Mode switches do not recompute history.** One shared tally; past
-   increments stay, future increments follow the new mode. The adjacent reset
-   button covers the "I want a clean count in the other mode" case.
+6. **Both tallies are always computed; the radio selects which is displayed.**
+   Detection is shared, so maintaining a Kills tally and a Destruction tally
+   simultaneously is nearly free. Switching the radio is a pure display
+   change — no history is lost or recomputed. Both values persist.
+7. **Yoshi insta-eats must count** (research-gated; see the dedicated section).
+   Most Yoshi eats are insta-swallows; a Kills mode that misses them is not
+   acceptable beyond a temporary first cut.
 
 ## Counting rules
 
@@ -80,7 +89,11 @@ v1 dead-set and governed by the mouth rules). "Live origin" means previous
 status not in `DEAD`, not `00`, and not `07`. All rules run only while
 attached, in game mode `$0100 == 0x14`, per sprite slot.
 
-### Base events (mode-independent detection, mode-dependent counting)
+Both tallies are updated on every event — the "Kills" and "Destruction"
+columns below describe each tally's increment, not alternative behaviors of a
+single tally.
+
+### Base events (shared detection, per-tally counting)
 
 Mouth entries are classified by the **creature filter** (ID list + koopa
 origin rule, defined below), not by origin status — items can idle at `08`
@@ -102,8 +115,11 @@ Notes:
   counts exactly once for creatures (E2 fires on the first eat; the spat-out
   shell re-enters as an item via the koopa origin rule).
 - The pending-coin mark clears whenever the slot's sprite number changes to
-  anything other than `0x21` or the slot restarts (`00 -> 01/08` respawn), so
-  a reused slot cannot resolve a stale pending coin.
+  anything other than `0x21`, the slot restarts (`00 -> 01/08` respawn), or
+  the coin leaves status `08` for anything other than `00` — including a
+  Yoshi tongue-grab (`08 -> 07`), which cancels the pending kill rather than
+  crediting it (conservative; whether the tongue can grab `#21` at all is a
+  verify-in-play item).
 - `$0DBF` "changed" (not "increased") so the 99→0 wrap on the 100th coin still
   registers.
 - A swallow (`07 -> 00`) with **no recorded mouth entry** (attach or gate-on
@@ -120,6 +136,7 @@ list:
 | ID | Observed as | Evidence |
 |----|-------------|----------|
 | `0x1B` | Football | `08->02` ×2, `08->05` ×3 |
+| `0x21` | Moving coin (incl. fireball-converted enemies) | fireball lifecycle observed; listed so a Yoshi tongue-grab of the coin can never register as a creature eat |
 | `0x2F` | Springboard | eat/spit loop `08->07`/`07->08`; swallow `07->00` ×2 |
 | `0x3E` | P-switch (poof after squish) | `09->04` ×4, `0B->04` ×2 |
 | `0x4B` | Rock thrown by digging Chuck (believed; verify in play) | `08->04` ×5 |
@@ -145,6 +162,33 @@ converted by the tape (`78`, `C8`) legitimately count as destruction; the
 filter's only role in Destruction is timing mouth events (count creatures at
 the eat, items at the swallow).
 
+## Yoshi insta-eat coverage (required, research-gated)
+
+Most enemies Yoshi eats are swallowed instantly — the slot despawns with the
+`07` state skipped or one-frame, indistinguishable *by status* from scrolling
+offscreen. Missing these is not acceptable for Kills beyond a temporary first
+cut, so v2 includes a dedicated detection path built on Yoshi state that
+persists for many frames (the tongue animation is long), making it
+sampling-safe:
+
+- **Intended rule:** while Yoshi's tongue/swallow state indicates a target
+  sprite slot, that slot's despawn (`-> 00`) counts as a kill (and
+  destruction) if the sprite passes the creature filter — items on the tongue
+  stay governed by the mouth rules (E2-E5).
+- **Candidate WRAM (to be confirmed by observation, not trusted from
+  memory-maps):** the Yoshi swallow timer (`$18AC` region) and the sprite
+  misc tables that hold the tongue-target slot index for the Yoshi sprite.
+  Step one of implementation extends `DebugLogger` to dump these candidates
+  each transition, then a Yoshi-heavy play session confirms which signal is
+  reliable before the rule is finalized.
+- **Interaction with E2-E5:** once a tongue-target signal exists, it also
+  disambiguates mouth entries that sampling currently blurs; the confirmed
+  signal may simplify those rules. Evidence decides — same method as the rest
+  of this spec.
+- **Fallback:** if no reliable signal is found in the research session, the
+  gap ships as a documented limitation *temporarily* and the research item
+  stays open — it is not silently accepted.
+
 ## Implementation
 
 All changes live in `KillCounter` plus small touches in
@@ -154,7 +198,10 @@ All changes live in `KillCounter` plus small touches in
 
 - New `public enum KillCountMode { Kills, Destruction }` and a
   `public KillCountMode Mode { get; set; }` property (default `Kills`),
-  modeled on `MoonCounter.DedupeMode`.
+  modeled on `MoonCounter.DedupeMode`. The mode is a **display selector**:
+  two internal tallies (`kills`, `destruction`) are always maintained;
+  `Value` returns the selected one. `SetValue` (settings value-box edit)
+  writes the selected tally only; `Reset` clears both.
 - Per-slot state grows from one `PreviousByte` to: previous status, previous
   sprite number (`$9E + i`), mouth-entry classification (enum/byte: none /
   creature / item, set at E2/E3 and cleared on spit/swallow/slot restart), and
@@ -165,8 +212,10 @@ All changes live in `KillCounter` plus small touches in
 - `DefaultLabel` stays `"Kills"` and `DefaultIcon` stays `kill.png` for both
   modes in v2 (the settings row is named by the feature; a Destruction icon
   and mode-following label are deferred). `Id` stays `"kills"`.
-- `SaveState`/`LoadState` add a `<KillMode>` element (int of the enum,
-  default `Kills`) alongside the existing `<Kills>` value.
+- `SaveState`/`LoadState` persist `<Kills>`, a new `<Destruction>`, and
+  `<KillMode>` (int of the enum, default `Kills`). A layout saved by v1 loads
+  with `<Destruction>` defaulting to 0 and mode Kills — same displayed value
+  as before.
 
 ### SmwCountersComponent
 
@@ -182,6 +231,8 @@ All changes live in `KillCounter` plus small touches in
   are visible in future sessions.
 - Add `coins=$0DBF` to the CTR context line, so coin-collection correlation
   can be checked from logs.
+- Dump the Yoshi-state candidates (swallow timer, tongue-target misc tables)
+  on sprite transitions, feeding the insta-eat research session.
 
 ## Tests
 
@@ -209,16 +260,25 @@ both modes unless stated:
    `$0DBF` unchanged = +0. Excluded-ID conversion sets no pending coin.
 9. Pending coin cleared by slot reuse (`00->01->08` with a new ID) — later
    coin-ish events don't count.
-10. Mode radio: same event stream, mode flipped mid-stream — increments follow
-    the mode active at event time; value not recomputed.
+10. Dual tallies: one event stream increments both tallies per their rules;
+    flipping `Mode` mid-stream changes only which tally `Value` returns —
+    nothing is lost or recomputed. `SetValue` writes only the selected tally.
 11. Game-mode gate / detach clears all per-slot state including mouth origin
     and pending coins (no bridged events).
-12. Save/load round-trips `<Kills>` and `<KillMode>`; load clears edge state.
+12. Save/load round-trips `<Kills>`, `<Destruction>`, and `<KillMode>`
+    (v1 documents load with Destruction 0, mode Kills); load clears edge
+    state.
+13. Coin tongue-grab: pending coin's `08->07` cancels the pending kill (+0
+    Kills) and, as an excluded-ID mouth entry, classifies as item pickup.
+14. Insta-eat rule (added after the research session confirms the Yoshi
+    signal): tongue-target slot despawning counts per the creature filter.
 
 ## Known limitations (document with the feature)
 
 - **Sampling blindness**: one-frame status excursions are invisible at
-  15-50 ms polling — Yoshi insta-swallows (koopalings, spinies) don't count.
+  15-50 ms effective polling; rules must key off multi-frame state. The one
+  known casualty — Yoshi insta-swallows — is NOT accepted: it has a dedicated
+  research-gated detection path (see "Yoshi insta-eat coverage").
 - **Coin-collection correlation is a heuristic**: an unrelated coin collected
   in the same poll a fireball coin times out would miscount (+1 Kills).
 - **ID lists assume this evidence generalizes**: custom sprites reusing listed
