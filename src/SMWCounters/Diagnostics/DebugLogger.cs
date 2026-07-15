@@ -34,6 +34,15 @@ internal sealed class DebugLogger
     private const int BossDefeat = 0x13C6; // exit: boss defeated
     private const int ExitsSaved = 0x1F2E; // exit: saved exit count
     private const int MoonByte = 0x13C5;   // moons collected this scene
+    private const int CoinCount = 0x0DBF;        // fireball-coin collection correlation
+
+    // Yoshi insta-eat research candidates (unverified — the whole point of
+    // logging them is to confirm which signal is reliable before the counter
+    // uses any of them; see the v2 spec, "Yoshi insta-eat coverage").
+    private const int YoshiSwallowTimer = 0x18AC;
+    private const int TongueTargetBase = 0x160E; // sprite misc table, per slot
+    private const int MouthFlagBase = 0x1594;    // sprite misc table, per slot
+    private const byte YoshiSpriteId = 0x35;
 
     // Sprite tables.
     private const int SpriteStatusBase = 0x14C8; // per-slot status ($14C8..$14D3)
@@ -42,6 +51,10 @@ internal sealed class DebugLogger
 
     private readonly string logPath;
     private readonly PreviousByte[] prevStatus;
+    private readonly PreviousByte[] prevSpriteNum;
+    private readonly PreviousByte[] prevTongueTarget;
+    private readonly PreviousByte[] prevMouthFlag;
+    private readonly PreviousByte prevSwallowTimer = new();
     private readonly Dictionary<string, int> lastValue = new();
     private StreamWriter writer;
 
@@ -56,6 +69,16 @@ internal sealed class DebugLogger
 
         prevStatus = new PreviousByte[SlotCount];
         for (int i = 0; i < SlotCount; i++) { prevStatus[i] = new PreviousByte(); }
+
+        prevSpriteNum = new PreviousByte[SlotCount];
+        prevTongueTarget = new PreviousByte[SlotCount];
+        prevMouthFlag = new PreviousByte[SlotCount];
+        for (int i = 0; i < SlotCount; i++)
+        {
+            prevSpriteNum[i] = new PreviousByte();
+            prevTongueTarget[i] = new PreviousByte();
+            prevMouthFlag[i] = new PreviousByte();
+        }
     }
 
     // Log this poll's counter increments and sprite-status transitions.
@@ -70,7 +93,14 @@ internal sealed class DebugLogger
     public void Idle()
     {
         lastValue.Clear();
-        for (int i = 0; i < SlotCount; i++) { prevStatus[i].Clear(); }
+        prevSwallowTimer.Clear();
+        for (int i = 0; i < SlotCount; i++)
+        {
+            prevStatus[i].Clear();
+            prevSpriteNum[i].Clear();
+            prevTongueTarget[i].Clear();
+            prevMouthFlag[i].Clear();
+        }
     }
 
     // Clear state and release the file (logging disabled / component disposed).
@@ -95,7 +125,8 @@ internal sealed class DebugLogger
                 string ctx = $"mode={Hex(mem, GameMode)} inLvl={Hex(mem, InLevel)} "
                     + $"anim={Hex(mem, PlayerAnim)} fanfare={Hex(mem, Fanfare)} "
                     + $"io={Hex(mem, Io)} boss={Hex(mem, BossDefeat)} "
-                    + $"exits={Hex(mem, ExitsSaved)} moon={Hex(mem, MoonByte)}";
+                    + $"exits={Hex(mem, ExitsSaved)} moon={Hex(mem, MoonByte)} "
+                    + $"coins={Hex(mem, CoinCount)}";
                 Write($"CTR {c.Id} {prev}->{cur} | phase={phase} {emuDesc} | {ctx}");
             }
         }
@@ -105,17 +136,85 @@ internal sealed class DebugLogger
     {
         for (int i = 0; i < SlotCount; i++)
         {
-            if (!mem.ReadWramByte(SpriteStatusBase + i, out byte status))
+            bool haveStatus = mem.ReadWramByte(SpriteStatusBase + i, out byte status);
+            bool haveSprite = mem.ReadWramByte(SpriteNumberBase + i, out byte spriteNum);
+            if (!haveStatus)
             {
                 prevStatus[i].Clear();
+                prevSpriteNum[i].Clear();
                 continue;
             }
+
             if (prevStatus[i].HasPrevious && prevStatus[i].Value != status)
             {
                 Write($"SPR slot{i} #{Hex(mem, SpriteNumberBase + i)} "
                     + $"{prevStatus[i].Value:X2}->{status:X2} | mode={Hex(mem, GameMode)}");
             }
             prevStatus[i].Set(status);
+
+            // Sprite-number changes without a status change (fireball -> coin
+            // conversions) were previously invisible; log them explicitly.
+            if (haveSprite)
+            {
+                if (prevSpriteNum[i].HasPrevious && prevSpriteNum[i].Value != spriteNum
+                    && status != 0x00)
+                {
+                    Write($"SPR slot{i} id #{prevSpriteNum[i].Value:X2}->#{spriteNum:X2} "
+                        + $"| status={status:X2} mode={Hex(mem, GameMode)}");
+                }
+                prevSpriteNum[i].Set(spriteNum);
+            }
+            else
+            {
+                prevSpriteNum[i].Clear();
+            }
+
+            LogYoshiCandidates(mem, i, haveSprite ? spriteNum : (byte)0);
+        }
+
+        if (mem.ReadWramByte(YoshiSwallowTimer, out byte swallow))
+        {
+            if (prevSwallowTimer.HasPrevious && prevSwallowTimer.Value != swallow)
+            {
+                Write($"YOS 18AC {prevSwallowTimer.Value:X2}->{swallow:X2}");
+            }
+            prevSwallowTimer.Set(swallow);
+        }
+        else
+        {
+            prevSwallowTimer.Clear();
+        }
+    }
+
+    // Research instrumentation: dump candidate Yoshi tongue/mouth bytes for
+    // slots holding the Yoshi sprite, so a play session can establish which
+    // signal reliably marks insta-eaten sprites (v2 spec, "Yoshi insta-eat
+    // coverage"). Remove or repurpose once the signal is confirmed.
+    private void LogYoshiCandidates(ISnesMemory mem, int slot, byte spriteNum)
+    {
+        if (spriteNum != YoshiSpriteId)
+        {
+            prevTongueTarget[slot].Clear();
+            prevMouthFlag[slot].Clear();
+            return;
+        }
+
+        if (mem.ReadWramByte(TongueTargetBase + slot, out byte tongue))
+        {
+            if (prevTongueTarget[slot].HasPrevious && prevTongueTarget[slot].Value != tongue)
+            {
+                Write($"YOS slot{slot} 160E {prevTongueTarget[slot].Value:X2}->{tongue:X2}");
+            }
+            prevTongueTarget[slot].Set(tongue);
+        }
+
+        if (mem.ReadWramByte(MouthFlagBase + slot, out byte mouth))
+        {
+            if (prevMouthFlag[slot].HasPrevious && prevMouthFlag[slot].Value != mouth)
+            {
+                Write($"YOS slot{slot} 1594 {prevMouthFlag[slot].Value:X2}->{mouth:X2}");
+            }
+            prevMouthFlag[slot].Set(mouth);
         }
     }
 
