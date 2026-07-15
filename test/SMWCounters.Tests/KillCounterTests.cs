@@ -305,4 +305,71 @@ public class KillCounterTests
         Assert.Equal(0, Kills(c));
         Assert.Equal(0, Destruction(c));
     }
+
+    // Fireball tests drive the coin counter ($0DBF) explicitly.
+    private static void PollSlot0Coins(KillCounter c, FakeSnesMemory m, byte status,
+                                       byte sprite, byte coins)
+    {
+        m.SetByte(CoinCount, coins);
+        PollSlot0(c, m, status, sprite);
+    }
+
+    [Fact]
+    public void FireballConversion_DestructionImmediately_KillOnCollectedCoin()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // E6: ID flips at 08
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);   // E7: despawn + coin gain
+        Assert.Equal(1, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    [Fact]
+    public void FireballCoinTimeout_NoKill()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // E6
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 10);   // despawn, coins flat
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    [Fact]
+    public void ExcludedIdConversion_NoEventAtAll()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0Coins(c, m, Alive, PSwitch, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // not a creature: no E6
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);   // and no pending coin
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+    }
+
+    [Fact]
+    public void CoinTongueGrab_CancelsPendingKill_ClassifiesAsItemPickup()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // E6, pending
+        PollSlot0Coins(c, m, Mouth, MovingCoin, coins: 10);  // tongue grab: cancel
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);   // swallow: item -> destruction
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(2, Destruction(c));  // conversion + swallowed item
+    }
+
+    [Fact]
+    public void SlotReuse_CancelsPendingCoin()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // E6, pending
+        PollSlot0Coins(c, m, Alive, BulletBill, coins: 10);  // slot re-used
+        PollSlot0Coins(c, m, 0x00, BulletBill, coins: 11);   // despawn + coin gain
+        Assert.Equal(0, Kills(c));                           // stale pending gone
+        Assert.Equal(1, Destruction(c));
+    }
 }

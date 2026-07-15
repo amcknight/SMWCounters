@@ -36,6 +36,7 @@ internal sealed class KillCounter : ISmwCounter
     private const int SpriteStatusBase = 0x14C8;
     private const int SpriteNumberBase = 0x009E;
     private const int SlotCount = 12;
+    private const int CoinCountOffset = 0x0DBF;
     private const byte GoalTapeSprite = 0x7B;
     private const byte MovingCoinSprite = 0x21;
 
@@ -59,6 +60,14 @@ internal sealed class KillCounter : ISmwCounter
     private readonly PreviousByte[] prevStatus;
     private readonly PreviousByte[] prevSprite;
     private readonly MouthEntry[] mouthEntry = new MouthEntry[SlotCount];
+
+    // Set when a creature was fireball-converted to a moving coin in this
+    // slot; resolved by the coin's clean despawn (kill iff the coin counter
+    // moved the same poll), cancelled by anything else (tongue grab, slot
+    // reuse). Conservative: when unsure, no kill.
+    private readonly bool[] pendingCoin = new bool[SlotCount];
+
+    private readonly PreviousByte prevCoins = new();
 
     private int kills;
     private int destruction;
@@ -113,6 +122,19 @@ internal sealed class KillCounter : ISmwCounter
             return;
         }
 
+        // "Changed", not "increased": the counter wraps 99 -> 0 on the coin
+        // that awards a life.
+        bool coinsChanged = false;
+        if (memory.ReadWramByte(CoinCountOffset, out byte coins))
+        {
+            coinsChanged = prevCoins.HasPrevious && coins != prevCoins.Value;
+            prevCoins.Set(coins);
+        }
+        else
+        {
+            prevCoins.Clear();
+        }
+
         for (int i = 0; i < SlotCount; i++)
         {
             if (!memory.ReadWramByte(SpriteStatusBase + i, out byte status)
@@ -121,11 +143,11 @@ internal sealed class KillCounter : ISmwCounter
                 ClearSlot(i);
                 continue;
             }
-            PollSlot(i, status, sprite);
+            PollSlot(i, status, sprite, coinsChanged);
         }
     }
 
-    private void PollSlot(int i, byte status, byte sprite)
+    private void PollSlot(int i, byte status, byte sprite, bool coinsChanged)
     {
         PreviousByte pStat = prevStatus[i];
         PreviousByte pSpr = prevSprite[i];
@@ -137,7 +159,37 @@ internal sealed class KillCounter : ISmwCounter
         }
 
         byte prevStat = pStat.Value;
+        byte prevSpr = pSpr.Value;
         bool liveOrigin = prevStat != 0x00 && prevStat != 0x07 && !IsDead(prevStat);
+
+        // E6: fireball conversion — the sprite number flips to the moving coin
+        // while the slot stays in the normal routine. Destruction immediately;
+        // the *kill* waits for proof of collection (uncollected coins let the
+        // enemy respawn).
+        if (prevStat == 0x08 && status == 0x08
+            && prevSpr != MovingCoinSprite && sprite == MovingCoinSprite)
+        {
+            if (IsCreature(prevSpr, prevStat))
+            {
+                destruction++;
+                pendingCoin[i] = true;
+            }
+        }
+        else if (pendingCoin[i])
+        {
+            // E7: a clean despawn of the still-coin slot counts as a collected
+            // kill iff the coin counter moved this same poll. Anything else —
+            // tongue grab, slot reuse, odd status — cancels the pending kill.
+            if (sprite == MovingCoinSprite && status == 0x00)
+            {
+                if (coinsChanged) { kills++; }
+                pendingCoin[i] = false;
+            }
+            else if (sprite != MovingCoinSprite || status != 0x08)
+            {
+                pendingCoin[i] = false;
+            }
+        }
 
         if (prevStat == 0x07 && status != 0x07)
         {
@@ -191,11 +243,13 @@ internal sealed class KillCounter : ISmwCounter
         prevStatus[i].Clear();
         prevSprite[i].Clear();
         mouthEntry[i] = MouthEntry.None;
+        pendingCoin[i] = false;
     }
 
     private void ClearAll()
     {
         for (int i = 0; i < SlotCount; i++) { ClearSlot(i); }
+        prevCoins.Clear();
     }
 
     public void SaveState(XmlDocument doc, XmlElement parent)
