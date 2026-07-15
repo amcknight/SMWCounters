@@ -49,8 +49,16 @@ internal sealed class KillCounter : ISmwCounter
         0x1B, 0x21, 0x2F, 0x3E, 0x4B, 0x53, 0x78, 0x7B, 0xC8,
     };
 
+    // Mouth-entry classification per slot: set when a sprite enters status 07,
+    // cleared when it leaves (swallow, spit) or the slot is cleared. Decides
+    // whether a swallow (07 -> 00) credits Destruction (item) or nothing
+    // (creature already counted at the eat; unknown entry counts nothing —
+    // conservative per the design priority).
+    private enum MouthEntry : byte { None, Creature, Item }
+
     private readonly PreviousByte[] prevStatus;
     private readonly PreviousByte[] prevSprite;
+    private readonly MouthEntry[] mouthEntry = new MouthEntry[SlotCount];
 
     private int kills;
     private int destruction;
@@ -131,9 +139,33 @@ internal sealed class KillCounter : ISmwCounter
         byte prevStat = pStat.Value;
         bool liveOrigin = prevStat != 0x00 && prevStat != 0x07 && !IsDead(prevStat);
 
-        // E1: dead-set entry from a live origin.
-        if (liveOrigin && IsDead(status))
+        if (prevStat == 0x07 && status != 0x07)
         {
+            // E4 (swallow) / E5 (spit): leaving the mouth either way clears
+            // the recorded entry. Only a swallowed *item* adds (Destruction);
+            // a creature was already counted when it was eaten.
+            if (status == 0x00 && mouthEntry[i] == MouthEntry.Item) { destruction++; }
+            mouthEntry[i] = MouthEntry.None;
+        }
+        else if (status == 0x07 && prevStat != 0x07 && liveOrigin)
+        {
+            // E2 (creature eaten) / E3 (item pickup). Classified by the
+            // creature filter, NOT origin status: items can idle at 08 too
+            // (springboard), so the ID list is the only reliable separator.
+            if (IsCreature(sprite, prevStat))
+            {
+                kills++;
+                destruction++;
+                mouthEntry[i] = MouthEntry.Creature;
+            }
+            else
+            {
+                mouthEntry[i] = MouthEntry.Item;
+            }
+        }
+        else if (liveOrigin && IsDead(status))
+        {
+            // E1: dead-set entry from a live origin.
             if (IsCreature(sprite, prevStat)) { kills++; }
             if (!(sprite == GoalTapeSprite && status == 0x06)) { destruction++; }
         }
@@ -158,6 +190,7 @@ internal sealed class KillCounter : ISmwCounter
     {
         prevStatus[i].Clear();
         prevSprite[i].Clear();
+        mouthEntry[i] = MouthEntry.None;
     }
 
     private void ClearAll()

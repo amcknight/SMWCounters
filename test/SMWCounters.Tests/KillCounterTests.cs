@@ -236,4 +236,73 @@ public class KillCounterTests
         c.Mode = KillCountMode.Destruction;
         Assert.Equal(0, c.Value);
     }
+
+    [Fact]
+    public void CreatureEat_CountsOnEat_SwallowAddsNothing()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive, Galoomba);
+        PollSlot0(c, m, Mouth, Galoomba);    // E2: 08 -> 07, creature
+        Assert.Equal(1, Kills(c));
+        Assert.Equal(1, Destruction(c));
+        PollSlot0(c, m, 0x00, Galoomba);     // E4: swallow, already counted
+        Assert.Equal(1, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    [Fact]
+    public void ItemEatSpitLoop_Silent_SwallowIsDestructionOnly()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        // Springboard idles at 08 (observed) — the eat looks status-identical
+        // to eating a live enemy; only the ID list separates them.
+        PollSlot0(c, m, Alive, Springboard);
+        PollSlot0(c, m, Mouth, Springboard); // E3: item pickup
+        PollSlot0(c, m, Alive, Springboard); // E5: spit back to 08
+        PollSlot0(c, m, Mouth, Springboard); // E3 again
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+        PollSlot0(c, m, 0x00, Springboard);  // E4: swallowed item
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    [Fact]
+    public void BareShellEat_IsItemPickup_ByKoopaOriginRule()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Carryable, GreenKoopa); // bare shell idles at 09
+        PollSlot0(c, m, Mouth, GreenKoopa);     // 09 -> 07: item, not creature
+        PollSlot0(c, m, Carryable, GreenKoopa); // spit
+        PollSlot0(c, m, Mouth, GreenKoopa);     // re-eat
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+        PollSlot0(c, m, 0x00, GreenKoopa);      // swallow
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    [Fact]
+    public void LiveShelledKoopaEat_CountsOnEat_SpitThenShellDeath_DestructionOnly()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive, GreenKoopa);
+        PollSlot0(c, m, Mouth, GreenKoopa);     // E2: living koopa eaten
+        Assert.Equal(1, Kills(c));
+        Assert.Equal(1, Destruction(c));
+        PollSlot0(c, m, Carryable, GreenKoopa); // E5: spit -> bare shell at 09
+        PollSlot0(c, m, Falling, GreenKoopa);   // E1: shell dies from 09
+        Assert.Equal(1, Kills(c));              // koopa rule: shell not a kill
+        Assert.Equal(2, Destruction(c));
+    }
+
+    [Fact]
+    public void SwallowWithoutRecordedEntry_CountsNothing()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Mouth, Galoomba);    // first sample IS 07: no entry seen
+        PollSlot0(c, m, 0x00, Galoomba);     // swallow with entry unknown
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+    }
 }
