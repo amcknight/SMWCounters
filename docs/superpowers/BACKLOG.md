@@ -41,6 +41,17 @@ first within each group.
   from the die-before-Exit revert. Could render stacked with distinct colors
   (e.g. orange on Finish, yellow on banked-Exit, white on Save). Needs game-over
   detection + a two-level banked model + multi-color rendering.
+- **Passivism counter needs new instrumentation.** The sprite-status table
+  (`$14C8`) cannot see non-lethal disturbance — bops, fireball hits, galoomba
+  flips, Chuck damage never touch the status byte — so a true "did I disturb
+  anything" counter is not buildable from it (established by the 2026-07-14
+  observation session; see the kills/destruction v2 spec). Research path:
+  extend `DebugLogger` to candidate WRAM (sprite stun timers, interaction
+  flags) and observe before designing anything.
+- **Editable kill-exclusion list (advanced UI).** The v2 Kills creature filter
+  is a hardcoded, evidence-driven sprite-ID list. Once it has seen real use,
+  expose it as an editable list (hex IDs) behind an advanced settings surface
+  so per-hack custom sprites can be reclassified.
 - **Weighted powerup counting (Cape/Fire = 2).** Parked. The rationale (Fire
   "contains" two powerups) is shaky since a hit while Cape/Fire appears to drop
   straight to Small, not Big, and may be hack-dependent. Revisit only with live
@@ -81,7 +92,10 @@ first within each group.
 - **Exit redo inflation.** Re-completing an already-saved exit fires the Finish
   collect but does not increment `$1F2E` (the game only counts new exits), so it
   would leave the Exit alert gold until a death or reset. Does not occur in
-  normal fresh-run play.
+  normal fresh-run play. The mirror image (observed live 2026-07-14): on a save
+  file that already owns the exits, collected exits never bank and a later death
+  reverts them to 0 — the counter appears "stuck at 0" when replaying owned
+  exits. Working as designed for fresh runs; confusing on replayed saves.
 - **Attract-demo counting.** If the LiveSplit timer is left running on the title
   screen, the SMW attract demo runs real level code and could count. The primary
   guard is "only count while the timer runs."
