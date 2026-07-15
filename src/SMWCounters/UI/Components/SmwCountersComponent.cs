@@ -146,6 +146,42 @@ public class SmwCountersComponent : IComponent
             Action refresh = () => chk.Checked = Settings.IsBankOnSave(counter.Id);
             return (panel, refresh);
         }
+        if (counter is KillCounter kill)
+        {
+            var rdoKills = new RadioButton
+            {
+                Text = "Kills",
+                AutoSize = true,
+                Checked = kill.Mode == KillCountMode.Kills,
+                Location = new Point(0, 2),
+            };
+            var rdoDestruction = new RadioButton
+            {
+                Text = "Destruction",
+                AutoSize = true,
+                Checked = kill.Mode == KillCountMode.Destruction,
+                Location = new Point(52, 2),
+            };
+            rdoKills.CheckedChanged += (_, __) =>
+            {
+                if (rdoKills.Checked) { kill.Mode = KillCountMode.Kills; }
+            };
+            rdoDestruction.CheckedChanged += (_, __) =>
+            {
+                if (rdoDestruction.Checked) { kill.Mode = KillCountMode.Destruction; }
+            };
+            extrasToolTip.SetToolTip(rdoKills, "Count creatures killed (evidence-based not-alive sprite list applies).");
+            extrasToolTip.SetToolTip(rdoDestruction, "Count anything destroyed: kills plus poofed/swallowed/converted objects.");
+            var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
+            panel.Controls.Add(rdoKills);
+            panel.Controls.Add(rdoDestruction);
+            Action refresh = () =>
+            {
+                rdoKills.Checked = kill.Mode == KillCountMode.Kills;
+                rdoDestruction.Checked = kill.Mode == KillCountMode.Destruction;
+            };
+            return (panel, refresh);
+        }
         return (null, null);
     }
 
