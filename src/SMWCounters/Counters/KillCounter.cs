@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Drawing;
 using System.Xml;
 
@@ -6,68 +7,89 @@ using LiveSplit.UI;
 
 namespace LiveSplit.SmwCounters.Counters;
 
-// Counts enemy kills by edge-detecting each sprite slot's status transitioning
-// from a live state into the "dead" set. The 12-byte sprite-status table lives
-// at $14C8 ($14C8..$14D3, one byte per slot).
+internal enum KillCountMode { Kills, Destruction }
+
+// Dual-tally counter over the SMW sprite tables ($14C8 status, $9E sprite
+// number, 12 slots). Both tallies are always computed; Mode selects which one
+// Value displays.
 //
-//   $7E:0100 (GameMode):      $14 = level main routine. Gate to this so
-//                             overworld / load-time garbage in the status table
-//                             doesn't count.
-//   $7E:14C8[i] (SpriteStatus): per-slot status. Dead set = the whole 02..07
-//                             range: 02 (killed, falling off screen),
-//                             03 (smushed), 04 (spinjumped), 05 (lava/mud),
-//                             06 (goal-tape coin), 07 (inside Yoshi's mouth).
+//   Kills:       creatures killed. Dead-set entries, live eats, and (later
+//                task) collected fireball coins — all gated by the creature
+//                filter below. Design priority: err toward NOT counting.
+//   Destruction: anything destroyed. Same events without the filter, except
+//                the goal tape's self-conversion (#7B -> 06) which destroys
+//                nothing.
 //
-// Rule: count once per slot when the previous sample was NOT in the dead set and
-// not empty ($00), and the current sample IS in the dead set. Treating the dead
-// set as one absorbing region means shuffling within it (e.g. 04 -> 02) does not
-// double-count, and offscreening (status -> 00) is naturally excluded. Only $00
-// is excluded as a "from" state; $01 (slot taken, uninitialized) is intentionally
-// countable, though a $01 -> dead transition is near-impossible in practice.
+// Dead set = {02 killed/falling, 03 smushed, 04 spinjumped, 05 lava, 06
+// goal-tape coin}. Status 07 (Yoshi's mouth) is deliberately NOT in the dead
+// set: it is reversible (spit) and is handled by the mouth rules (E2-E5,
+// later task).
 //
-// The set is the uniform 02..07 range (chosen for simplicity). Consequences:
-//   - Yoshi's mouth (07) counts, so eaten enemies register. A berry, or an enemy
-//     spat out then re-eaten, can register on the 08 -> 07 entry.
-//   - Goal-tape coin (06) counts, so crossing the goal registers a BURST of kills
-//     (one per on-screen sprite the tape converts). 0C (goal-tape -> powerup) is
-//     just outside the range, so that path is asymmetric and not counted.
-//
-// v1 deliberately does no sprite-ID filtering: a P-switch press can register
-// (observed: when it puffs to smoke) and will count. This is an observation
-// instrument; a "doesn't count as a kill" sprite list (P-switch, berry, ...)
-// waits on real-play data.
+// Creature filter (evidence-driven, from the 2026-07-14 log session — see the
+// v2 spec): a sprite is "not alive" if its ID is on the observed-offender
+// list, or if it is a koopa ID (04-07, shared by bare shells) dying from a
+// carryable state instead of the normal routine (08).
 internal sealed class KillCounter : ISmwCounter
 {
     private const int GameModeOffset = 0x0100;
     private const byte LevelMainMode = 0x14;
     private const int SpriteStatusBase = 0x14C8;
+    private const int SpriteNumberBase = 0x009E;
     private const int SlotCount = 12;
+    private const byte GoalTapeSprite = 0x7B;
+    private const byte MovingCoinSprite = 0x21;
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.kill.png");
 
-    private readonly PreviousByte[] previousStatus;
+    // Observed to enter the dead set without being creatures:
+    // 1B football, 21 moving coin, 2F springboard, 3E P-switch, 4B chuck rock,
+    // 53 throw block, 78 1-up, 7B goal tape, C8 accordion block.
+    private static readonly HashSet<byte> NotAlive = new()
+    {
+        0x1B, 0x21, 0x2F, 0x3E, 0x4B, 0x53, 0x78, 0x7B, 0xC8,
+    };
+
+    private readonly PreviousByte[] prevStatus;
+    private readonly PreviousByte[] prevSprite;
+
+    private int kills;
+    private int destruction;
 
     public KillCounter()
     {
-        previousStatus = new PreviousByte[SlotCount];
-        for (int i = 0; i < SlotCount; i++) { previousStatus[i] = new PreviousByte(); }
+        prevStatus = new PreviousByte[SlotCount];
+        prevSprite = new PreviousByte[SlotCount];
+        for (int i = 0; i < SlotCount; i++)
+        {
+            prevStatus[i] = new PreviousByte();
+            prevSprite[i] = new PreviousByte();
+        }
     }
 
     public string Id => "kills";
     public Image DefaultIcon => icon;
     public string DefaultLabel => "Kills";
 
-    public int Value { get; private set; }
+    // Display selector: both tallies are always maintained; the radio in
+    // settings flips this to choose which one renders. Not a behavior switch.
+    public KillCountMode Mode { get; set; } = KillCountMode.Kills;
+
+    public int Value => Mode == KillCountMode.Kills ? kills : destruction;
 
     public bool ValueIsAlert => false;
 
-    public void Reset()
+    public void SetValue(int value)
     {
-        Value = 0;
-        ClearAll();
+        if (Mode == KillCountMode.Kills) { kills = value; }
+        else { destruction = value; }
     }
 
-    public void SetValue(int value) => Value = value;
+    public void Reset()
+    {
+        kills = 0;
+        destruction = 0;
+        ClearAll();
+    }
 
     public void Poll(ISnesMemory memory)
     {
@@ -85,37 +107,81 @@ internal sealed class KillCounter : ISmwCounter
 
         for (int i = 0; i < SlotCount; i++)
         {
-            if (!memory.ReadWramByte(SpriteStatusBase + i, out byte status))
+            if (!memory.ReadWramByte(SpriteStatusBase + i, out byte status)
+                || !memory.ReadWramByte(SpriteNumberBase + i, out byte sprite))
             {
-                previousStatus[i].Clear();
+                ClearSlot(i);
                 continue;
             }
-
-            PreviousByte prev = previousStatus[i];
-            if (prev.HasPrevious && prev.Value != 0x00 && !IsDead(prev.Value) && IsDead(status))
-            {
-                Value++;
-            }
-
-            prev.Set(status);
+            PollSlot(i, status, sprite);
         }
     }
 
-    private static bool IsDead(byte status) => status >= 0x02 && status <= 0x07;
+    private void PollSlot(int i, byte status, byte sprite)
+    {
+        PreviousByte pStat = prevStatus[i];
+        PreviousByte pSpr = prevSprite[i];
+        if (!pStat.HasPrevious || !pSpr.HasPrevious)
+        {
+            pStat.Set(status);
+            pSpr.Set(sprite);
+            return;
+        }
+
+        byte prevStat = pStat.Value;
+        bool liveOrigin = prevStat != 0x00 && prevStat != 0x07 && !IsDead(prevStat);
+
+        // E1: dead-set entry from a live origin.
+        if (liveOrigin && IsDead(status))
+        {
+            if (IsCreature(sprite, prevStat)) { kills++; }
+            if (!(sprite == GoalTapeSprite && status == 0x06)) { destruction++; }
+        }
+
+        pStat.Set(status);
+        pSpr.Set(sprite);
+    }
+
+    // "Alive" gate for the Kills tally: observed-offender IDs never count, and
+    // koopa IDs (04-07, shared with their bare shells) only count when the
+    // origin was the normal routine (08) — a living koopa, not a shell.
+    private static bool IsCreature(byte sprite, byte originStatus)
+    {
+        if (NotAlive.Contains(sprite)) { return false; }
+        if (sprite >= 0x04 && sprite <= 0x07 && originStatus != 0x08) { return false; }
+        return true;
+    }
+
+    private static bool IsDead(byte status) => status >= 0x02 && status <= 0x06;
+
+    private void ClearSlot(int i)
+    {
+        prevStatus[i].Clear();
+        prevSprite[i].Clear();
+    }
 
     private void ClearAll()
     {
-        for (int i = 0; i < SlotCount; i++) { previousStatus[i].Clear(); }
+        for (int i = 0; i < SlotCount; i++) { ClearSlot(i); }
     }
 
     public void SaveState(XmlDocument doc, XmlElement parent)
     {
-        SettingsHelper.CreateSetting(doc, parent, "Kills", Value);
+        SettingsHelper.CreateSetting(doc, parent, "Kills", kills);
+        SettingsHelper.CreateSetting(doc, parent, "Destruction", destruction);
+        SettingsHelper.CreateSetting(doc, parent, "KillMode", Mode.ToString());
     }
 
     public void LoadState(XmlElement parent)
     {
-        Value = SettingsHelper.ParseInt(parent["Kills"], 0);
+        kills = SettingsHelper.ParseInt(parent["Kills"], 0);
+        destruction = SettingsHelper.ParseInt(parent["Destruction"], 0);
+
+        XmlElement modeEl = parent["KillMode"];
+        Mode = modeEl != null && System.Enum.TryParse(modeEl.InnerText, out KillCountMode mode)
+            ? mode
+            : KillCountMode.Kills;
+
         ClearAll();
     }
 }
