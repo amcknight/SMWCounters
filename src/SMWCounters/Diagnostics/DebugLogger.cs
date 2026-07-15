@@ -11,10 +11,17 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 // (per the "Debug log" setting), each poll appends event lines to a log file:
 //
 //   CTR <id> <old>-><new> | phase=.. <emu> | mode=.. inLvl=.. anim=.. fanfare=..
-//       io=.. boss=.. exits=.. moon=..        (a counter incremented; context is
+//       io=.. boss=.. exits=.. moon=.. coins=..
+//                                             (a counter incremented; context is
 //                                              the WRAM the counters key off of)
 //   SPR slot<n> #<spriteNum> <old>-><new> | mode=..
 //                                             (a sprite slot's $14C8 status changed)
+//   SPR slot<n> id #<old>->#<new> | status=.. mode=..
+//                                             (sprite-number change while status
+//                                              unchanged; suppressed when status=00)
+//   YOS 18AC <old>-><new>                    (Yoshi swallow timer; research candidate)
+//   YOS slot<n> 160E/1594 <old>-><new>      (Yoshi tongue/mouth bytes; unverified
+//                                              addresses — see v2 spec)
 //
 // The SPR trace answers questions like "what status does a fireballed enemy pass
 // through?" and "does the coin reuse the enemy's slot?"; the CTR line answers
@@ -207,6 +214,10 @@ internal sealed class DebugLogger
             }
             prevTongueTarget[slot].Set(tongue);
         }
+        else
+        {
+            prevTongueTarget[slot].Clear();
+        }
 
         if (mem.ReadWramByte(MouthFlagBase + slot, out byte mouth))
         {
@@ -215,6 +226,10 @@ internal sealed class DebugLogger
                 Write($"YOS slot{slot} 1594 {prevMouthFlag[slot].Value:X2}->{mouth:X2}");
             }
             prevMouthFlag[slot].Set(mouth);
+        }
+        else
+        {
+            prevMouthFlag[slot].Clear();
         }
     }
 
