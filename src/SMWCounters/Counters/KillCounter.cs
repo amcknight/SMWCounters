@@ -13,17 +13,16 @@ internal enum KillCountMode { Kills, Destruction }
 // number, 12 slots). Both tallies are always computed; Mode selects which one
 // Value displays.
 //
-//   Kills:       creatures killed. Dead-set entries, live eats, and (later
-//                task) collected fireball coins — all gated by the creature
-//                filter below. Design priority: err toward NOT counting.
+//   Kills:       creatures killed. Dead-set entries, live eats, and collected
+//                fireball coins — all gated by the creature filter below.
+//                Design priority: err toward NOT counting.
 //   Destruction: anything destroyed. Same events without the filter, except
 //                the goal tape's self-conversion (#7B -> 06) which destroys
 //                nothing.
 //
 // Dead set = {02 killed/falling, 03 smushed, 04 spinjumped, 05 lava, 06
 // goal-tape coin}. Status 07 (Yoshi's mouth) is deliberately NOT in the dead
-// set: it is reversible (spit) and is handled by the mouth rules (E2-E5,
-// later task).
+// set: it is reversible (spit) and is handled by the mouth rules (E2-E5).
 //
 // Creature filter (evidence-driven, from the 2026-07-14 log session — see the
 // v2 spec): a sprite is "not alive" if its ID is on the observed-offender
@@ -92,6 +91,10 @@ internal sealed class KillCounter : ISmwCounter
     public KillCountMode Mode { get; set; } = KillCountMode.Kills;
 
     public int Value => Mode == KillCountMode.Kills ? kills : destruction;
+
+    // Layout-dirty hash input: both tallies and the mode are persisted, so all
+    // three must influence the settings hash even while only one displays.
+    internal int StateHash => kills ^ (destruction * 397) ^ (int)Mode;
 
     public bool ValueIsAlert => false;
 
@@ -217,7 +220,11 @@ internal sealed class KillCounter : ISmwCounter
         }
         else if (liveOrigin && IsDead(status))
         {
-            // E1: dead-set entry from a live origin.
+            // E1: dead-set entry from a live origin. Note: a pending fireball
+            // coin (E6 already counted Destruction) entering the dead set
+            // instead of despawning cleanly is unobserved in evidence (coins
+            // are seen to end 08 -> 00); if it happened, Destruction would be
+            // double-counted here on top of E6 — accepted as Kills-safe.
             if (IsCreature(sprite, prevStat)) { kills++; }
             if (!(sprite == GoalTapeSprite && status == 0x06)) { destruction++; }
         }

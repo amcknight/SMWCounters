@@ -372,4 +372,58 @@ public class KillCounterTests
         Assert.Equal(0, Kills(c));                           // stale pending gone
         Assert.Equal(1, Destruction(c));
     }
+
+    // Pins every ID on the NotAlive exclusion list (KillCounter's NotAlive
+    // HashSet): each one entering the dead set from a live origin counts
+    // Destruction only, never Kills. 0x7B (goal tape) is included here with a
+    // non-06 dead status — only its 06 self-conversion is fully excluded
+    // (see GoalTapeSelfConversion_CountsNothing), and 0x04 exercises that
+    // "only 06 is special" distinction directly.
+    [Theory]
+    [InlineData(0x1B)] // football
+    [InlineData(0x21)] // moving coin
+    [InlineData(0x2F)] // springboard
+    [InlineData(0x3E)] // P-switch
+    [InlineData(0x4B)] // chuck rock
+    [InlineData(0x53)] // throw block
+    [InlineData(0x78)] // 1-up
+    [InlineData(0xC8)] // accordion block
+    [InlineData(0x7B)] // goal tape, non-06 dead status
+    public void NotAliveTable_DeadEntry_DestructionOnly(byte spriteId)
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive, spriteId);
+        PollSlot0(c, m, Spinjump, spriteId);  // 08 -> 04: excluded ID, Destruction only
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    // Goal-burst items (1-up, accordion block) can enter the tape-coin status
+    // (06) alongside a genuine goal-tape self-conversion. Unlike the tape
+    // itself, they are not exempted from Destruction — only sprite #7B at
+    // status 06 is.
+    [Theory]
+    [InlineData(0x78)] // 1-up
+    [InlineData(0xC8)] // accordion block
+    public void GoalBurstItem_TapeCoinEntry_DestructionOnly(byte spriteId)
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive, spriteId);
+        PollSlot0(c, m, TapeCoin, spriteId);  // 08 -> 06, non-goal-tape ID: destruction only
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    [Fact]
+    public void GameModeGate_MidMouth_ClearsRecordedItemEntry_SwallowCountsNothing()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive, Springboard);
+        PollSlot0(c, m, Mouth, Springboard);                   // E3: item pickup, entry recorded
+        PollSlot0(c, m, Mouth, Springboard, gameMode: 0x00);   // gate off: ClearAll wipes the entry
+        PollSlot0(c, m, Mouth, Springboard, gameMode: Level);  // back in-level, still 07: re-primes only
+        PollSlot0(c, m, 0x00, Springboard);                    // swallow: entry unknown, counts nothing
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+    }
 }

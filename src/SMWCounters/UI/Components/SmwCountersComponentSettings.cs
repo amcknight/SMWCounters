@@ -296,7 +296,10 @@ public class SmwCountersComponentSettings : UserControl
         if (Visible) { RefreshValueBoxes(); }
     }
 
-    private void RefreshValueBoxes()
+    // Internal so the component can force a resync after a counter-specific
+    // control (e.g. the Kills/Destruction radio) changes which tally a row's
+    // value box displays, without waiting for the box to lose focus first.
+    internal void RefreshValueBoxes()
     {
         foreach (CounterRow row in rows)
         {
