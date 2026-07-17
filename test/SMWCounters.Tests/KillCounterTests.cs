@@ -14,7 +14,9 @@ public class KillCounterTests
     private const byte Galoomba = 0x0F, GreenKoopa = 0x04, PSwitch = 0x3E,
                        GoalTape = 0x7B, MovingCoin = 0x21, BulletBill = 0x1C,
                        Springboard = 0x2F, PipeLakitu = 0x4B, ChuckRock = 0x48,
-                       MessageBox = 0xB9;
+                       MessageBox = 0xB9, Yoshi = 0x35, Spiny = 0x13;
+    private const int TongueTargetBase = 0x160E;
+    private const byte NoTarget = 0xFF;
 
     // Drive sprite slot 0 only (other slots unset => reads fail => cleared/skipped).
     // Every poll must supply a sprite ID too — the counter reads $9E per slot.
@@ -487,6 +489,78 @@ public class KillCounterTests
         }
         PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);   // unrelated coin much later
         Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    // Insta-eat polls drive slot 0 as the target and slot 1 as a mounted
+    // Yoshi (#35 at status 08) whose $160E byte holds the tongue-target slot
+    // index (FF = idle). Confirmed by the 2026-07-16 research session: six
+    // insta-eats all latched $160E to the victim's slot, and the victim
+    // despawned 08->00 on the same poll the byte reset to FF.
+    private static void PollTongue(KillCounter c, FakeSnesMemory m, byte tongue,
+                                   byte targetStatus, byte targetSprite)
+    {
+        m.SetByte(GameMode, Level);
+        m.SetByte(StatusBase, targetStatus);
+        m.SetByte(SpriteBase, targetSprite);
+        m.SetByte(StatusBase + 1, Alive);
+        m.SetByte(SpriteBase + 1, Yoshi);
+        m.SetByte(TongueTargetBase + 1, tongue);
+        c.Poll(m);
+    }
+
+    [Fact]
+    public void InstaEat_TongueTargetedCreatureDespawns_CountsBoth()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollTongue(c, m, NoTarget, Alive, Spiny);
+        PollTongue(c, m, 0x00, Alive, Spiny);     // tongue latches slot 0
+        PollTongue(c, m, NoTarget, 0x00, Spiny);  // same poll: byte resets + despawn
+        Assert.Equal(1, Kills(c));
+        Assert.Equal(1, Destruction(c));
+        PollTongue(c, m, NoTarget, 0x00, Spiny);  // no recount
+        Assert.Equal(1, Kills(c));
+    }
+
+    [Fact]
+    public void InstaEat_ExcludedId_CountsNothing()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollTongue(c, m, NoTarget, Alive, PSwitch);
+        PollTongue(c, m, 0x00, Alive, PSwitch);
+        PollTongue(c, m, NoTarget, 0x00, PSwitch); // items are governed by mouth rules
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+    }
+
+    [Fact]
+    public void InstaEat_LingerExpired_PlainDespawnDoesNotCount()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollTongue(c, m, NoTarget, Alive, Spiny);
+        PollTongue(c, m, 0x00, Alive, Spiny);      // tongue latches...
+        for (int i = 0; i < 6; i++)
+        {
+            PollTongue(c, m, NoTarget, Alive, Spiny);  // ...but the target survives
+        }
+        PollTongue(c, m, NoTarget, 0x00, Spiny);   // later offscreen despawn
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+    }
+
+    // A mouth-visible eat under an active tongue signal (living koopa: E2
+    // fires at 08->07) must not double count when the swallow (07->00) lands
+    // while the tongue linger is still warm.
+    [Fact]
+    public void InstaEat_MouthEatUnderTongueSignal_NoDoubleCount()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollTongue(c, m, NoTarget, Alive, Galoomba);
+        PollTongue(c, m, 0x00, Alive, Galoomba);
+        PollTongue(c, m, 0x00, Mouth, Galoomba);   // E2: kill counted at the eat
+        Assert.Equal(1, Kills(c));
+        PollTongue(c, m, NoTarget, 0x00, Galoomba); // swallow while linger warm
+        Assert.Equal(1, Kills(c));
         Assert.Equal(1, Destruction(c));
     }
 

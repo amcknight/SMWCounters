@@ -38,6 +38,13 @@ internal sealed class KillCounter : ISmwCounter
     private const int CoinCountOffset = 0x0DBF;
     private const byte GoalTapeSprite = 0x7B;
     private const byte MovingCoinSprite = 0x21;
+    private const byte YoshiSprite = 0x35;
+
+    // Per-slot Yoshi misc byte: while Yoshi's tongue holds a sprite, this
+    // holds the victim's slot index (FF when idle). Confirmed by the
+    // 2026-07-16 research session — see the v2 spec, "Yoshi insta-eat
+    // coverage".
+    private const int TongueTargetBase = 0x160E;
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.kill.png");
 
@@ -79,6 +86,20 @@ internal sealed class KillCounter : ISmwCounter
     // margin, while staying short enough (~65 ms at 60 Hz polling) that an
     // unrelated coin grab rarely lands inside it.
     private const int CoinKillWindowPolls = 4;
+
+    // Polls a slot stays "recently tongue-targeted" after Yoshi's $160E byte
+    // stops naming it. Insta-eaten sprites (spinies, lakitus, piranhas, ...)
+    // skip mouth status 07 entirely and despawn on the exact poll the byte
+    // resets to FF, so the despawn edge needs this linger to see the tongue.
+    private const int TongueLingerPolls = 4;
+
+    private readonly int[] tongueLinger = new int[SlotCount];
+
+    // Per-poll read buffers: all slots are read before any slot is processed,
+    // so a Yoshi in a later slot can mark a tongue target in an earlier one.
+    private readonly byte[] statusBuf = new byte[SlotCount];
+    private readonly byte[] spriteBuf = new byte[SlotCount];
+    private readonly bool[] okBuf = new bool[SlotCount];
 
     private readonly PreviousByte prevCoins = new();
 
@@ -154,13 +175,31 @@ internal sealed class KillCounter : ISmwCounter
 
         for (int i = 0; i < SlotCount; i++)
         {
-            if (!memory.ReadWramByte(SpriteStatusBase + i, out byte status)
-                || !memory.ReadWramByte(SpriteNumberBase + i, out byte sprite))
+            okBuf[i] = memory.ReadWramByte(SpriteStatusBase + i, out statusBuf[i])
+                && memory.ReadWramByte(SpriteNumberBase + i, out spriteBuf[i]);
+        }
+
+        // Mark tongue targets before processing despawns: an active Yoshi
+        // (sprite #35 in its normal routine — a stale $9E on an empty slot
+        // must not poison the linger) naming slot t keeps t's linger warm.
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (okBuf[i] && spriteBuf[i] == YoshiSprite && statusBuf[i] == 0x08
+                && memory.ReadWramByte(TongueTargetBase + i, out byte target)
+                && target < SlotCount)
+            {
+                tongueLinger[target] = TongueLingerPolls + 1;
+            }
+        }
+
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (!okBuf[i])
             {
                 ClearSlot(i);
                 continue;
             }
-            PollSlot(i, status, sprite);
+            PollSlot(i, statusBuf[i], spriteBuf[i]);
         }
 
         // Resolve despawned pending coins: one coin-counter change proves one
@@ -184,6 +223,7 @@ internal sealed class KillCounter : ISmwCounter
         for (int i = 0; i < SlotCount; i++)
         {
             if (coinWindow[i] > 0) { coinWindow[i]--; }
+            if (tongueLinger[i] > 0) { tongueLinger[i]--; }
         }
     }
 
@@ -266,6 +306,22 @@ internal sealed class KillCounter : ISmwCounter
             if (IsCreature(sprite, prevStat)) { kills++; }
             if (!(sprite == GoalTapeSprite && status == 0x06)) { destruction++; }
         }
+        else if (prevStat == 0x08 && status == 0x00 && tongueLinger[i] > 0)
+        {
+            // E8: insta-eat — a recently tongue-targeted sprite despawning
+            // straight from its normal routine was swallowed whole (spinies,
+            // lakitus, piranhas skip mouth status 07 entirely). Requires the
+            // 08 origin: mouth-visible eats (07 -> 00 swallows) stay with
+            // E2-E5 even while the linger is warm. Non-creatures count
+            // nothing — real item grabs are seen to go through the mouth, so
+            // an excluded ID here is more likely slot noise than a swallow.
+            if (IsCreature(sprite, prevStat))
+            {
+                kills++;
+                destruction++;
+            }
+            tongueLinger[i] = 0;
+        }
 
         pStat.Set(status);
         pSpr.Set(sprite);
@@ -290,6 +346,7 @@ internal sealed class KillCounter : ISmwCounter
         mouthEntry[i] = MouthEntry.None;
         pendingCoin[i] = false;
         coinWindow[i] = 0;
+        tongueLinger[i] = 0;
     }
 
     private void ClearAll()

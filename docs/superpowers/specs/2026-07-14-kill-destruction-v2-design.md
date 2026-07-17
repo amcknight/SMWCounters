@@ -183,6 +183,17 @@ sampling-safe:
   Step one of implementation extends `DebugLogger` to dump these candidates
   each transition, then a Yoshi-heavy play session confirms which signal is
   reliable before the rule is finalized.
+- **CONFIRMED 2026-07-16 (research session):** `$160E + yoshiSlot` holds the
+  tongue-target slot index (`FF` idle) and is the reliable signal. Six
+  insta-eats (spiny ×4, pipe lakitu ×2) all latched it to the victim's slot
+  for ~200-300 ms; the victim despawned `08->00` on the same poll the byte
+  reset to `FF` (hence the implementation lingers the mark a few polls). The
+  mouth-eat contrast held: a mouth-visible eat sends the target to `07` while
+  `$160E` keeps naming it, so requiring the `08->00` edge cleanly separates
+  the two paths. `$1594 + yoshiSlot` tracks tongue phase (0 idle / 1
+  extending / 2 holding / 3 spit) and `$18AC` is a noisy frame timer — both
+  usable as confirmations, neither needed. Rule implemented as E8 in
+  `KillCounter`.
 - **Interaction with E2-E5:** once a tongue-target signal exists, it also
   disambiguates mouth entries that sampling currently blurs; the confirmed
   signal may simplify those rules. Evidence decides — same method as the rest
