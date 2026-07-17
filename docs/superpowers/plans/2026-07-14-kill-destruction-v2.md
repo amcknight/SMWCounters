@@ -12,14 +12,14 @@
 
 - `Id` must stay `"kills"` — stable serialization key, never change.
 - Dead-set is exactly `{0x02..0x06}`. Status `0x07` (Yoshi's mouth) is governed only by the mouth rules (E2-E5 in the spec).
-- Not-alive sprite-ID list is exactly `{0x1B, 0x21, 0x2F, 0x3E, 0x4B, 0x53, 0x78, 0x7B, 0xC8}` (evidence-driven; do not add speculative IDs).
+- Not-alive sprite-ID list at plan time was `{0x1B, 0x21, 0x2F, 0x3E, 0x4B, 0x53, 0x78, 0x7B, 0xC8}` (evidence-driven; do not add speculative IDs). **Superseded by the 2026-07-16 session — see the spec's creature-filter table and `KillCounter.NotAlive`: 0x4B was removed (it is the pipe-dwelling Lakitu, a creature, not the chuck rock), and 0x48 (Diggin' Chuck's rock) + 0xB9 (message box) were added.**
 - Koopa origin rule: sprite IDs `0x04-0x07` pass the creature filter only when the origin status is `0x08`.
 - Design priority: when in doubt, err toward NOT counting a Kill.
 - In-level gate: `$0100 == 0x14`; detach/gate-off/reset/load clear all per-slot edge state (no bridged events).
 - Both tallies always update; the radio/mode is a display selector only. `SetValue` writes the selected tally only; `Reset` clears both.
 - Persistence elements: `<Kills>`, `<Destruction>`, `<KillMode>` (enum name string, like MoonCounter's `DedupeMode`). A v1 document (only `<Kills>`) must load with destruction 0, mode Kills.
 - Build: `dotnet build src/SMWCounters/SMWCounters.csproj -c Release`. Test: `dotnet test test/SMWCounters.Tests/SMWCounters.Tests.csproj`.
-- The Yoshi **insta-eat rule is NOT in this plan** — it is research-gated (spec section "Yoshi insta-eat coverage"). Task 5 ships the logger upgrades that enable the research session; the rule lands in a follow-up plan once the WRAM signal is confirmed.
+- The Yoshi **insta-eat rule is NOT in this plan** — it was research-gated (spec section "Yoshi insta-eat coverage"). Task 5 shipped the logger upgrades that enabled the research session. **Resolved 2026-07-16: the session confirmed `$160E` as the tongue-target signal, and the rule was added directly as E8 in `KillCounter` on this branch rather than in a separate follow-up plan.**
 
 ---
 
@@ -1203,7 +1203,7 @@ git commit -m "feat: DebugLogger logs sprite-id changes, coin count, Yoshi resea
 ## Post-plan follow-ups (not tasks in this plan)
 
 1. **Live validation session:** run LiveSplit with the rebuilt component, Kills row + debug log enabled; re-test the session's scenarios (P-switch, springboard eat/spit/swallow, shell loops, goal tape, fireball coin collected vs ignored, key eating). Expected: exclusion-list behavior matches the spec's E-table; any new offender IDs get appended to `NotAlive` with a log citation.
-2. **Yoshi insta-eat research:** analyze the `YOS` lines from a Yoshi-heavy session; confirm which signal marks insta-eaten sprites; then write the follow-up plan implementing the insta-eat rule (spec section "Yoshi insta-eat coverage", test scenario 14).
+2. **Yoshi insta-eat research:** analyze the `YOS` lines from a Yoshi-heavy session; confirm which signal marks insta-eaten sprites; then write the follow-up plan implementing the insta-eat rule (spec section "Yoshi insta-eat coverage", test scenario 14). **Done 2026-07-16 — `$160E` confirmed; rule shipped as E8 on this branch, no separate plan needed.**
 
 ## Self-Review
 

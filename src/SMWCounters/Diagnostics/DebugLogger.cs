@@ -86,13 +86,12 @@ internal sealed class DebugLogger
         logPath = Path.Combine(dir, "counters-debug.log");
 
         prevStatus = new PreviousByte[SlotCount];
-        for (int i = 0; i < SlotCount; i++) { prevStatus[i] = new PreviousByte(); }
-
         prevSpriteNum = new PreviousByte[SlotCount];
         prevTongueTarget = new PreviousByte[SlotCount];
         prevMouthFlag = new PreviousByte[SlotCount];
         for (int i = 0; i < SlotCount; i++)
         {
+            prevStatus[i] = new PreviousByte();
             prevSpriteNum[i] = new PreviousByte();
             prevTongueTarget[i] = new PreviousByte();
             prevMouthFlag[i] = new PreviousByte();
@@ -202,17 +201,24 @@ internal sealed class DebugLogger
             LogYoshiCandidates(mem, i, haveSprite ? spriteNum : (byte)0);
         }
 
-        if (mem.ReadWramByte(YoshiSwallowTimer, out byte swallow))
+        LogByteChange(mem, YoshiSwallowTimer, prevSwallowTimer, "YOS 18AC");
+    }
+
+    // Log "<label> <old>-><new>" whenever the watched byte changes between
+    // successful reads; a failed read clears the edge state instead.
+    private void LogByteChange(ISnesMemory mem, int offset, PreviousByte prev, string label)
+    {
+        if (mem.ReadWramByte(offset, out byte value))
         {
-            if (prevSwallowTimer.HasPrevious && prevSwallowTimer.Value != swallow)
+            if (prev.HasPrevious && prev.Value != value)
             {
-                Write($"YOS 18AC {prevSwallowTimer.Value:X2}->{swallow:X2}");
+                Write($"{label} {prev.Value:X2}->{value:X2}");
             }
-            prevSwallowTimer.Set(swallow);
+            prev.Set(value);
         }
         else
         {
-            prevSwallowTimer.Clear();
+            prev.Clear();
         }
     }
 
@@ -229,31 +235,8 @@ internal sealed class DebugLogger
             return;
         }
 
-        if (mem.ReadWramByte(TongueTargetBase + slot, out byte tongue))
-        {
-            if (prevTongueTarget[slot].HasPrevious && prevTongueTarget[slot].Value != tongue)
-            {
-                Write($"YOS slot{slot} 160E {prevTongueTarget[slot].Value:X2}->{tongue:X2}");
-            }
-            prevTongueTarget[slot].Set(tongue);
-        }
-        else
-        {
-            prevTongueTarget[slot].Clear();
-        }
-
-        if (mem.ReadWramByte(MouthFlagBase + slot, out byte mouth))
-        {
-            if (prevMouthFlag[slot].HasPrevious && prevMouthFlag[slot].Value != mouth)
-            {
-                Write($"YOS slot{slot} 1594 {prevMouthFlag[slot].Value:X2}->{mouth:X2}");
-            }
-            prevMouthFlag[slot].Set(mouth);
-        }
-        else
-        {
-            prevMouthFlag[slot].Clear();
-        }
+        LogByteChange(mem, TongueTargetBase + slot, prevTongueTarget[slot], $"YOS slot{slot} 160E");
+        LogByteChange(mem, MouthFlagBase + slot, prevMouthFlag[slot], $"YOS slot{slot} 1594");
     }
 
     private static string Hex(ISnesMemory mem, int offset)
