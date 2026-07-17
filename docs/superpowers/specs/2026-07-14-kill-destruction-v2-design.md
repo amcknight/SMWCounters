@@ -139,10 +139,12 @@ list:
 | `0x21` | Moving coin (incl. fireball-converted enemies) | fireball lifecycle observed; listed so a Yoshi tongue-grab of the coin can never register as a creature eat |
 | `0x2F` | Springboard | eat/spit loop `08->07`/`07->08`; swallow `07->00` ×2 |
 | `0x3E` | P-switch (poof after squish) | `09->04` ×4, `0B->04` ×2 |
-| `0x4B` | Rock thrown by digging Chuck (believed; verify in play) | `08->04` ×5 |
+| ~~`0x4B`~~ | ~~Rock thrown by digging Chuck (believed; verify in play)~~ **CORRECTED 2026-07-16: 0x4B is the pipe-dwelling Lakitu — a creature. Removed from the list; the rock is `0x48`.** | 07-16 session: `#4B` fireballs into a coin (`id #4B->#21` ×4) and spinjumps like a creature (`08->04` ×12) |
+| `0x48` | Diggin' Chuck's rock | 07-16 session: `#48 08->02` counted a false kill at 22:26:40 |
 | `0x53` | Throw block (poof) | `09->04` ×2 |
 | `0x78` | 1-Up (goal-tape conversion) | `08->06` ×4 |
 | `0x7B` | Goal tape itself | `08->06` ×2 |
+| `0xB9` | Message box (goal-tape conversion) | 07-16 session: `#B9 08->06` at 22:21:26 counted a false kill; again 22:39:08 |
 | `0xC8` | Accordion block (goal-tape conversion; hack sprite) | `08->06` ×4 |
 
 Plus one **origin-qualified rule**: IDs `0x04-0x07` (shelled koopas — bare

@@ -42,11 +42,14 @@ internal sealed class KillCounter : ISmwCounter
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.kill.png");
 
     // Observed to enter the dead set without being creatures:
-    // 1B football, 21 moving coin, 2F springboard, 3E P-switch, 4B chuck rock,
-    // 53 throw block, 78 1-up, 7B goal tape, C8 accordion block.
+    // 1B football, 21 moving coin, 2F springboard, 3E P-switch, 48 Diggin'
+    // Chuck's rock, 53 throw block, 78 1-up, 7B goal tape, B9 message box,
+    // C8 accordion block. (0x4B was listed here as "chuck rock" from the
+    // 07-14 session; the 07-16 session proved 0x4B is the pipe-dwelling
+    // Lakitu — a creature — and the rock is 0x48.)
     private static readonly HashSet<byte> NotAlive = new()
     {
-        0x1B, 0x21, 0x2F, 0x3E, 0x4B, 0x53, 0x78, 0x7B, 0xC8,
+        0x1B, 0x21, 0x2F, 0x3E, 0x48, 0x53, 0x78, 0x7B, 0xB9, 0xC8,
     };
 
     // Mouth-entry classification per slot: set when a sprite enters status 07,
@@ -61,10 +64,21 @@ internal sealed class KillCounter : ISmwCounter
     private readonly MouthEntry[] mouthEntry = new MouthEntry[SlotCount];
 
     // Set when a creature was fireball-converted to a moving coin in this
-    // slot; resolved by the coin's clean despawn (kill iff the coin counter
-    // moved the same poll), cancelled by anything else (tongue grab, slot
-    // reuse). Conservative: when unsure, no kill.
+    // slot; resolved by the coin's clean despawn, cancelled by anything else
+    // (tongue grab, slot reuse). Conservative: when unsure, no kill.
     private readonly bool[] pendingCoin = new bool[SlotCount];
+
+    // Polls remaining in which a coin-counter change still proves the pending
+    // coin that despawned from this slot was collected. The despawn edge and
+    // the $0DBF change routinely straddle a poll boundary (WRAM reads are not
+    // frame-atomic), so requiring same-poll coincidence dropped most kills.
+    private readonly int[] coinWindow = new int[SlotCount];
+
+    // Polls after a pending coin's despawn during which a coin-counter change
+    // still counts as its collection. Covers observed one-poll straddles with
+    // margin, while staying short enough (~65 ms at 60 Hz polling) that an
+    // unrelated coin grab rarely lands inside it.
+    private const int CoinKillWindowPolls = 4;
 
     private readonly PreviousByte prevCoins = new();
 
@@ -146,11 +160,34 @@ internal sealed class KillCounter : ISmwCounter
                 ClearSlot(i);
                 continue;
             }
-            PollSlot(i, status, sprite, coinsChanged);
+            PollSlot(i, status, sprite);
+        }
+
+        // Resolve despawned pending coins: one coin-counter change proves one
+        // collection (credit the oldest open window only), then age the rest.
+        if (coinsChanged)
+        {
+            int oldest = -1;
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (coinWindow[i] > 0 && (oldest < 0 || coinWindow[i] < coinWindow[oldest]))
+                {
+                    oldest = i;
+                }
+            }
+            if (oldest >= 0)
+            {
+                kills++;
+                coinWindow[oldest] = 0;
+            }
+        }
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (coinWindow[i] > 0) { coinWindow[i]--; }
         }
     }
 
-    private void PollSlot(int i, byte status, byte sprite, bool coinsChanged)
+    private void PollSlot(int i, byte status, byte sprite)
     {
         PreviousByte pStat = prevStatus[i];
         PreviousByte pSpr = prevSprite[i];
@@ -180,13 +217,14 @@ internal sealed class KillCounter : ISmwCounter
         }
         else if (pendingCoin[i])
         {
-            // E7: a clean despawn of the still-coin slot counts as a collected
-            // kill iff the coin counter moved this same poll. Anything else —
-            // tongue grab, slot reuse, odd status — cancels the pending kill.
+            // E7: a clean despawn of the still-coin slot opens a short window
+            // in which a coin-counter change counts it as a collected kill
+            // (resolved centrally in Poll). Anything else — tongue grab, slot
+            // reuse, odd status — cancels the pending kill.
             if (sprite == MovingCoinSprite && status == 0x00)
             {
-                if (coinsChanged) { kills++; }
                 pendingCoin[i] = false;
+                coinWindow[i] = CoinKillWindowPolls + 1;
             }
             else if (sprite != MovingCoinSprite || status != 0x08)
             {
@@ -251,6 +289,7 @@ internal sealed class KillCounter : ISmwCounter
         prevSprite[i].Clear();
         mouthEntry[i] = MouthEntry.None;
         pendingCoin[i] = false;
+        coinWindow[i] = 0;
     }
 
     private void ClearAll()

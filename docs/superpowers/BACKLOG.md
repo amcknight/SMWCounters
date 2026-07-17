@@ -52,6 +52,30 @@ first within each group.
   is a hardcoded, evidence-driven sprite-ID list. Once it has seen real use,
   expose it as an editable list (hex IDs) behind an advanced settings surface
   so per-hack custom sprites can be reclassified.
+- **Property-based creature filter (replace/augment the NotAlive blacklist).**
+  The 2026-07-16 session showed the blacklist will keep growing (message box
+  `0xB9` counted at the goal tape) and is error-prone (`0x4B` was mislabeled
+  "chuck rock"; it's the pipe-dwelling Lakitu — the rock is `0x48`). SMW copies
+  six per-sprite "tweaker" property bytes into WRAM per slot
+  (`$1656/$1662/$166E/$167A/$1686/$190F`) with creature-adjacent bits
+  ("inedible", "don't turn into a coin when goal passed", …). The DebugLogger
+  now emits `PRP` lines dumping these bytes on every death/mouth entry; once a
+  few sessions of data exist, evaluate whether a bit predicate separates
+  creatures from objects. Until then, grow the blacklist only with `PRP`/`SPR`
+  log citations. Whitelist was considered and rejected (worse: silent
+  undercounting of every unlisted creature).
+- **Yoshi insta-eat rule — `$160E` is the lead.** Tonight's `YOS` lines show
+  Yoshi's per-slot `$160E` byte holds the tongue-target slot index (`FF` idle,
+  `FF->06` while grabbing slot 6). Insta-eaten sprites (piranha, koopaling,
+  spiny/pipe-lakitu eats) despawn without ever reaching mouth status 07, so the
+  rule is likely: target of an active tongue despawns 08->00 ⇒ eaten. `$18AC`
+  (swallow timer) is a noisy frame counter — probably only useful as a
+  confirmation edge, not a trigger. Needs one focused Yoshi session + follow-up
+  plan (v2 spec, "Yoshi insta-eat coverage").
+- **Disco-shell stomp doesn't count (koopa origin rule).** A disco shell dies
+  from kicked status (`0A->04`), which the koopa origin rule excludes from
+  Kills by design (observed 22:42:11, 2026-07-16). Debatable whether a
+  Yoshi-stomped disco shell "is" a creature kill; revisit if it grates.
 - **Weighted powerup counting (Cape/Fire = 2).** Parked. The rationale (Fire
   "contains" two powerups) is shaky since a hit while Cape/Fire appears to drop
   straight to Small, not Big, and may be hack-dependent. Revisit only with live
@@ -81,6 +105,12 @@ first within each group.
   counters from Settings (pick a WRAM address + edge/compare rule + label/icon),
   rather than only the built-in set. Larger feature; needs a small rule DSL and
   UI.
+- **Pending-kill gold/white rendering for fireball coins.** Idea from the
+  2026-07-16 session: when a creature is fireball-converted, show the would-be
+  kill in gold (like unbanked exits), revert it if the coin despawns
+  uncollected, and settle to white when the coin is collected. Requires the
+  counter to expose a "pending kills" count and the renderer to color partial
+  values; pairs naturally with the existing exit banking colors.
 - **Author line low% nudge.** The greyed author line currently just credits
   twitch.tv/mangort. Could optionally add a short "try low%: min jumps /
   powerups" suggestion. Deemed possibly intrusive; left as credit-only for now.

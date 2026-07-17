@@ -22,6 +22,12 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 //   YOS 18AC <old>-><new>                    (Yoshi swallow timer; research candidate)
 //   YOS slot<n> 160E/1594 <old>-><new>      (Yoshi tongue/mouth bytes; unverified
 //                                              addresses — see v2 spec)
+//   PRP slot<n> #<spriteNum> ->ss 1656=.. 1662=.. 166E=.. 167A=.. 1686=.. 190F=..
+//                                             (the slot's six tweaker property bytes,
+//                                              dumped when a sprite enters a dead/mouth
+//                                              status 02-07 — builds the evidence table
+//                                              for a property-based creature filter that
+//                                              could replace the NotAlive ID blacklist)
 //
 // The SPR trace answers questions like "what status does a fireballed enemy pass
 // through?" and "does the coin reuse the enemy's slot?"; the CTR line answers
@@ -55,6 +61,11 @@ internal sealed class DebugLogger
     private const int SpriteStatusBase = 0x14C8; // per-slot status ($14C8..$14D3)
     private const int SpriteNumberBase = 0x009E; // per-slot sprite id ($9E..$A9)
     private const int SlotCount = 12;
+
+    // Per-slot "tweaker" property tables (copied from ROM at spawn). Dumped on
+    // death/mouth entries to research whether some bit combination separates
+    // creatures from objects better than the ID blacklist does.
+    private static readonly int[] TweakerBases = { 0x1656, 0x1662, 0x166E, 0x167A, 0x1686, 0x190F };
 
     private readonly string logPath;
     private readonly PreviousByte[] prevStatus;
@@ -156,6 +167,18 @@ internal sealed class DebugLogger
             {
                 Write($"SPR slot{i} #{Hex(mem, SpriteNumberBase + i)} "
                     + $"{prevStatus[i].Value:X2}->{status:X2} | mode={Hex(mem, GameMode)}");
+
+                // Death or mouth entry: dump the slot's property bytes so the
+                // candidate table grows with every observed casualty.
+                if (status >= 0x02 && status <= 0x07)
+                {
+                    string props = "";
+                    foreach (int b in TweakerBases)
+                    {
+                        props += $" {b:X4}={Hex(mem, b + i)}";
+                    }
+                    Write($"PRP slot{i} #{Hex(mem, SpriteNumberBase + i)} ->{status:X2}{props}");
+                }
             }
             prevStatus[i].Set(status);
 

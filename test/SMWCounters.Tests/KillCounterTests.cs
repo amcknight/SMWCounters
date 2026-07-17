@@ -13,7 +13,8 @@ public class KillCounterTests
     // Sprite IDs used in tests (from the spec's evidence table).
     private const byte Galoomba = 0x0F, GreenKoopa = 0x04, PSwitch = 0x3E,
                        GoalTape = 0x7B, MovingCoin = 0x21, BulletBill = 0x1C,
-                       Springboard = 0x2F;
+                       Springboard = 0x2F, PipeLakitu = 0x4B, ChuckRock = 0x48,
+                       MessageBox = 0xB9;
 
     // Drive sprite slot 0 only (other slots unset => reads fail => cleared/skipped).
     // Every poll must supply a sprite ID too — the counter reads $9E per slot.
@@ -384,9 +385,10 @@ public class KillCounterTests
     [InlineData(0x21)] // moving coin
     [InlineData(0x2F)] // springboard
     [InlineData(0x3E)] // P-switch
-    [InlineData(0x4B)] // chuck rock
+    [InlineData(0x48)] // Diggin' Chuck's rock
     [InlineData(0x53)] // throw block
     [InlineData(0x78)] // 1-up
+    [InlineData(0xB9)] // message box
     [InlineData(0xC8)] // accordion block
     [InlineData(0x7B)] // goal tape, non-06 dead status
     public void NotAliveTable_DeadEntry_DestructionOnly(byte spriteId)
@@ -410,6 +412,80 @@ public class KillCounterTests
         var c = new KillCounter(); var m = new FakeSnesMemory();
         PollSlot0(c, m, Alive, spriteId);
         PollSlot0(c, m, TapeCoin, spriteId);  // 08 -> 06, non-goal-tape ID: destruction only
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    // 0x4B was blacklisted as "chuck rock" from the 2026-07-14 session, but the
+    // 2026-07-16 session proved 0x4B is the pipe-dwelling Lakitu (it fireballs
+    // into a coin and dies like a creature); the real rock is 0x48. Lakitu
+    // kills must count in both tallies.
+    [Fact]
+    public void PipeLakituKill_CountsInBoth()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive, PipeLakitu);
+        PollSlot0(c, m, Spinjump, PipeLakitu);  // 08 -> 04: creature kill
+        Assert.Equal(1, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    // Message boxes convert 08 -> 06 with everything else when the goal tape
+    // fires (observed 22:21:26 / 22:39:08, 2026-07-16 session) — destruction,
+    // never a kill.
+    [Fact]
+    public void MessageBoxAtTape_DestructionOnly()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Alive, MessageBox);
+        PollSlot0(c, m, TapeCoin, MessageBox);  // 08 -> 06 at the tape
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    // The despawn edge and the coin-counter change routinely land one poll
+    // apart (observed: spiny coin at 22:33:43 counted nothing while the
+    // 22:32:04 one landed same-poll). The kill must survive the coin change
+    // arriving a few polls late.
+    [Fact]
+    public void FireballCoin_CoinChangeOnePollAfterDespawn_StillCountsKill()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // E6, pending
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 10);   // despawn, coins not seen yet
+        Assert.Equal(0, Kills(c));
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);   // coin lands one poll late
+        Assert.Equal(1, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    [Fact]
+    public void FireballCoin_CoinChangeWithinWindow_CountsKillOnce()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // E6, pending
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 10);   // despawn
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 10);   // coins still flat
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);   // 2 polls late: within window
+        Assert.Equal(1, Kills(c));
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 12);   // later change: window consumed
+        Assert.Equal(1, Kills(c));
+    }
+
+    [Fact]
+    public void FireballCoin_CoinChangeAfterWindowExpires_NoKill()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // E6, pending
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 10);   // despawn opens the window
+        for (int i = 0; i < 8; i++)
+        {
+            PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 10);  // window runs dry
+        }
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);   // unrelated coin much later
         Assert.Equal(0, Kills(c));
         Assert.Equal(1, Destruction(c));
     }
