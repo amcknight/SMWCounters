@@ -18,3 +18,4 @@ lib/*.dll
 # OS noise
 Thumbs.db
 .DS_Store
+.claude/wrap/

@@ -107,7 +107,7 @@ origin rule, defined below), not by origin status — items can idle at `08`
 | E4 | Swallow | `07 -> 00` | 0 (a creature was already counted at E2; an item is not a kill) | +1 if entry was *item* (destroyed); 0 if *creature* (already counted at E2) |
 | E5 | Spit | `07 ->` any live status (`08/09/0A` observed) | 0 (clear mouth entry) | 0 (clear mouth entry) |
 | E6 | Fireball conversion | sprite number flips to `0x21` while status stays `08`; pre-conversion ID passes creature filter | 0 (mark slot *pending-coin*) | +1 |
-| E7 | Pending coin resolved | pending-coin slot goes `08 -> 00` | +1 if the coin counter `$0DBF` changed on the same poll (collected); 0 otherwise (timeout/offscreen → enemy respawns) | 0 (already counted at E6) |
+| E7 | Pending coin resolved | pending-coin slot goes `08 -> 00` | +1 if the coin counter `$0DBF` changes within a short window (~4 polls) after the despawn — the despawn edge and the `$0DBF` change routinely straddle a poll boundary, so same-poll coincidence dropped most kills (2026-07-16); one counter change credits the oldest open window. 0 if no change lands in the window (timeout/offscreen → enemy respawns) | 0 (already counted at E6) |
 
 Notes:
 
@@ -139,10 +139,12 @@ list:
 | `0x21` | Moving coin (incl. fireball-converted enemies) | fireball lifecycle observed; listed so a Yoshi tongue-grab of the coin can never register as a creature eat |
 | `0x2F` | Springboard | eat/spit loop `08->07`/`07->08`; swallow `07->00` ×2 |
 | `0x3E` | P-switch (poof after squish) | `09->04` ×4, `0B->04` ×2 |
-| `0x4B` | Rock thrown by digging Chuck (believed; verify in play) | `08->04` ×5 |
+| ~~`0x4B`~~ | ~~Rock thrown by digging Chuck (believed; verify in play)~~ **CORRECTED 2026-07-16: 0x4B is the pipe-dwelling Lakitu — a creature. Removed from the list; the rock is `0x48`.** | 07-16 session: `#4B` fireballs into a coin (`id #4B->#21` ×4) and spinjumps like a creature (`08->04` ×12) |
+| `0x48` | Diggin' Chuck's rock | 07-16 session: `#48 08->02` counted a false kill at 22:26:40 |
 | `0x53` | Throw block (poof) | `09->04` ×2 |
 | `0x78` | 1-Up (goal-tape conversion) | `08->06` ×4 |
 | `0x7B` | Goal tape itself | `08->06` ×2 |
+| `0xB9` | Message box (goal-tape conversion) | 07-16 session: `#B9 08->06` at 22:21:26 counted a false kill; again 22:39:08 |
 | `0xC8` | Accordion block (goal-tape conversion; hack sprite) | `08->06` ×4 |
 
 Plus one **origin-qualified rule**: IDs `0x04-0x07` (shelled koopas — bare
@@ -181,6 +183,17 @@ sampling-safe:
   Step one of implementation extends `DebugLogger` to dump these candidates
   each transition, then a Yoshi-heavy play session confirms which signal is
   reliable before the rule is finalized.
+- **CONFIRMED 2026-07-16 (research session):** `$160E + yoshiSlot` holds the
+  tongue-target slot index (`FF` idle) and is the reliable signal. Six
+  insta-eats (spiny ×4, pipe lakitu ×2) all latched it to the victim's slot
+  for ~200-300 ms; the victim despawned `08->00` on the same poll the byte
+  reset to `FF` (hence the implementation lingers the mark a few polls). The
+  mouth-eat contrast held: a mouth-visible eat sends the target to `07` while
+  `$160E` keeps naming it, so requiring the `08->00` edge cleanly separates
+  the two paths. `$1594 + yoshiSlot` tracks tongue phase (0 idle / 1
+  extending / 2 holding / 3 spit) and `$18AC` is a noisy frame timer — both
+  usable as confirmations, neither needed. Rule implemented as E8 in
+  `KillCounter`.
 - **Interaction with E2-E5:** once a tongue-target signal exists, it also
   disambiguates mouth entries that sampling currently blurs; the confirmed
   signal may simplify those rules. Evidence decides — same method as the rest
@@ -256,8 +269,9 @@ both modes unless stated:
 7. Goal burst: creature → `06` counts in Kills; item IDs don't; all except
    `#7B` count in Destruction.
 8. Fireball: ID flip to `0x21` at status `08` = +1 Destruction immediately,
-   +0 Kills; then `08->00` with `$0DBF` changed same poll = +1 Kills; with
-   `$0DBF` unchanged = +0. Excluded-ID conversion sets no pending coin.
+   +0 Kills; then `08->00` followed by a `$0DBF` change within the collection
+   window = +1 Kills; with `$0DBF` never changing in the window = +0.
+   Excluded-ID conversion sets no pending coin.
 9. Pending coin cleared by slot reuse (`00->01->08` with a new ID) — later
    coin-ish events don't count.
 10. Dual tallies: one event stream increments both tallies per their rules;
@@ -277,10 +291,14 @@ both modes unless stated:
 
 - **Sampling blindness**: one-frame status excursions are invisible at
   15-50 ms effective polling; rules must key off multi-frame state. The one
-  known casualty — Yoshi insta-swallows — is NOT accepted: it has a dedicated
-  research-gated detection path (see "Yoshi insta-eat coverage").
+  known casualty — Yoshi insta-swallows — is handled by the E8 insta-eat rule
+  (tongue-target `$160E` + a few-poll linger), added after the 2026-07-16
+  research session confirmed the signal (see "Yoshi insta-eat coverage").
 - **Coin-collection correlation is a heuristic**: an unrelated coin collected
-  in the same poll a fireball coin times out would miscount (+1 Kills).
+  within the short window (~4 polls) after a fireball coin times out would
+  miscount (+1 Kills). The window trades that rare false positive for catching
+  the common case where the despawn and the `$0DBF` change land on different
+  polls.
 - **ID lists assume this evidence generalizes**: custom sprites reusing listed
   IDs are misclassified (e.g. a custom creature on `0x4B`). The deferred
   editable list is the escape hatch.
