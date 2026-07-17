@@ -51,7 +51,16 @@ first within each group.
 - **Editable kill-exclusion list (advanced UI).** The v2 Kills creature filter
   is a hardcoded, evidence-driven sprite-ID list. Once it has seen real use,
   expose it as an editable list (hex IDs) behind an advanced settings surface
-  so per-hack custom sprites can be reclassified.
+  so per-hack custom sprites can be reclassified. Path decided 2026-07-16: the
+  full "not alive" list is effectively impossible to complete by hand, so (1)
+  grow a best-effort default list from play sessions of the games actually
+  being run (PRP log lines make each candidate citable), then (2) expose the
+  list to the user as the escape hatch for everything else.
+- **"Goal tape doesn't kill" checkbox.** Creatures converted to coins by the
+  goal tape (`08->06`) currently count as Kills (bullet bill, chuck confirmed
+  2026-07-16). Add a kills-row setting to exclude goal-tape conversions from
+  the Kills tally for players who don't consider the tape a weapon —
+  status `06` entries would then count Destruction only.
 - **Property-based creature filter (replace/augment the NotAlive blacklist).**
   The 2026-07-16 session showed the blacklist will keep growing (message box
   `0xB9` counted at the goal tape) and is error-prone (`0x4B` was mislabeled
@@ -126,6 +135,10 @@ first within each group.
   file that already owns the exits, collected exits never bank and a later death
   reverts them to 0 — the counter appears "stuck at 0" when replaying owned
   exits. Working as designed for fresh runs; confusing on replayed saves.
+- **Destruction tally is not live-validated.** The 2026-07-16 sessions
+  validated the Kills tally scenario-by-scenario; Destruction shipped on unit
+  tests alone (shared detection paths, so risk is low). Flip the radio to
+  Destruction for a session and spot-check poofs/swallows/conversions.
 - **Attract-demo counting.** If the LiveSplit timer is left running on the title
   screen, the SMW attract demo runs real level code and could count. The primary
   guard is "only count while the timer runs."
