@@ -20,7 +20,7 @@ public class SmwCountersComponent : IComponent
 
     private readonly LiveSplitState state;
     private readonly Timer pollTimer;
-    private readonly SnesEmu emu = new();
+    private readonly SnesConnection connection = new();
     private readonly DebugLogger debugLog = new();
 
     // Shared "always detached" memory used to flush per-counter edge state
@@ -203,10 +203,18 @@ public class SmwCountersComponent : IComponent
 
     private void Poll()
     {
-        // Only count during a live run. NotRunning covers title screen / file
-        // select / overworld-before-start (where SMW demos and casual play
-        // would otherwise pollute the counter); Ended covers post-run idle.
-        // Paused counts as active so a pause/resume preserves edge continuity.
+        // Always-on discovery: the connection ticks every poll regardless of
+        // timer phase, so the status dot is already green when a run starts
+        // (structural discovery takes seconds; gating it on the timer would
+        // lose the first seconds of counting).
+        connection.Tick();
+        if (Settings.DebugLog) { debugLog.LogStatus(connection.Status); }
+
+        // Counters still only count during a live run. NotRunning covers
+        // title screen / file select / overworld-before-start (where SMW
+        // demos and casual play would otherwise pollute the counter); Ended
+        // covers post-run idle. Paused counts as active so a pause/resume
+        // preserves edge continuity.
         bool timerActive = state.CurrentPhase == TimerPhase.Running
             || state.CurrentPhase == TimerPhase.Paused;
 
@@ -220,32 +228,36 @@ public class SmwCountersComponent : IComponent
                 if (Settings.IsEnabled(c.Id)) { c.Poll(inert); }
             }
             debugLog.Idle();
-            Settings.SetStatus("Paused · timer not running");
+            Settings.SetStatus("Paused · timer not running · " + connection.Describe());
             return;
         }
 
-        if (!emu.TryAttach())
-        {
-            debugLog.Idle();
-            Settings.SetStatus(emu.LastError ?? "No emulator found");
-            return;
-        }
+        // Poll counters against the live connection even when it is not
+        // (yet) attached: each counter's !IsAttached branch flushes its edge
+        // state, so a mid-run detach can't bridge stale samples on reattach.
         foreach (ISmwCounter c in counters)
         {
             if (c is PowerupCounter pc) { pc.Banked = Settings.IsBankOnSave(c.Id); }
-            if (Settings.IsEnabled(c.Id)) { c.Poll(emu); }
+            if (Settings.IsEnabled(c.Id)) { c.Poll(connection); }
+        }
+
+        if (!connection.IsAttached)
+        {
+            debugLog.Idle();
+            Settings.SetStatus(connection.Describe());
+            return;
         }
 
         if (Settings.DebugLog)
         {
-            debugLog.Poll(emu, counters, id => Settings.IsEnabled(id),
-                          state.CurrentPhase.ToString(), emu.Describe());
-            Settings.SetStatus("Counting · " + emu.Describe() + " · debug log → " + debugLog.LogPath);
+            debugLog.Poll(connection, counters, id => Settings.IsEnabled(id),
+                          state.CurrentPhase.ToString(), connection.Describe());
+            Settings.SetStatus("Counting · " + connection.Describe() + " · debug log → " + debugLog.LogPath);
         }
         else
         {
             debugLog.Close();
-            Settings.SetStatus("Counting · " + emu.Describe());
+            Settings.SetStatus("Counting · " + connection.Describe());
         }
     }
 
@@ -254,6 +266,7 @@ public class SmwCountersComponent : IComponent
         try { Settings.Hook?.Poll(); } catch { }
 
         cache.Restart();
+        cache["dot"] = Settings.ShowStatusDot ? connection.DotColor.ToArgb() : 0;
         foreach (ISmwCounter c in counters)
         {
             if (!Settings.IsEnabled(c.Id)) { continue; }
@@ -309,6 +322,19 @@ public class SmwCountersComponent : IComponent
             HAlignment.Right  => Math.Max(5f, width - totalWidth - 5f),
             _                 => 5f,
         };
+
+        // Status pixel: a tiny connection-health indicator pinned to the
+        // component's top-left corner, outside the row flow so it stays put
+        // regardless of counter layout or alignment.
+        if (Settings.ShowStatusDot)
+        {
+            const float dotSize = 5f;
+            using (var dotBrush = new SolidBrush(connection.DotColor))
+            {
+                g.FillRectangle(dotBrush, 3f, 1f, dotSize, dotSize);
+            }
+        }
+
         foreach (ISmwCounter c in enabled)
         {
             (float labelW, float valueW) = cellWidths[c.Id];

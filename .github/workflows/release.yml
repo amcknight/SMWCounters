@@ -51,12 +51,16 @@ jobs:
           $out = "release-staging"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           Copy-Item $dll.FullName    (Join-Path $out "SMWCounters.dll")
+          $snes = Get-ChildItem -Recurse -Filter SNES.dll artifacts | Select-Object -First 1
+          if (-not $snes) { throw "SNES.dll not found in build output" }
+          Copy-Item $snes.FullName   (Join-Path $out "SNES.dll")
           Copy-Item "README.md"      $out
           Copy-Item "LICENSE"        $out
           Copy-Item "CREDITS.md"     $out
           $zip = "SMWCounters-${{ steps.ver.outputs.version }}.zip"
           Compress-Archive -Path "$out/*" -DestinationPath $zip -Force
           "dll=release-staging/SMWCounters.dll" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "snesdll=release-staging/SNES.dll" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "zip=$zip"             | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Publish GitHub Release
@@ -66,14 +70,18 @@ jobs:
           name: ${{ steps.ver.outputs.version }}
           body: |
             ## Install
-            1. Download `SMWCounters.dll` below.
-            2. Copy it into your `LiveSplit/Components/` folder.
+            1. Download `SMWCounters.dll` **and** `SNES.dll` below (or the zip, which contains both).
+            2. Copy **both** into your `LiveSplit/Components/` folder.
             3. In LiveSplit: right-click → Edit Layout → **+** → **Other → SMW Counters**.
 
-            Requires a supported SNES emulator running Super Mario World, and the
-            LiveSplit timer running for counts to increment.
+            Works with any SNES emulator build (RetroArch, snes9x, bsnes, higan,
+            Mesen, BizHawk, ares, Mednafen) running Super Mario World — WRAM is
+            found automatically, no per-version configuration. The LiveSplit
+            timer must be running for counts to increment; the status dot shows
+            connection health at all times.
           files: |
             ${{ steps.stage.outputs.dll }}
+            ${{ steps.stage.outputs.snesdll }}
             ${{ steps.stage.outputs.zip }}
 
       - name: Upload build artifacts (manual runs)
@@ -83,4 +91,5 @@ jobs:
           name: SMWCounters-${{ steps.ver.outputs.version }}
           path: |
             ${{ steps.stage.outputs.dll }}
+            ${{ steps.stage.outputs.snesdll }}
             ${{ steps.stage.outputs.zip }}

@@ -5,6 +5,10 @@ obj/
 
 # Fetched third-party assemblies (see scripts/fetch-livesplit-core.ps1)
 lib/*.dll
+# ...except the pinned SNES.dll (structural WRAM discovery, from the
+# snes_offsets project). Upgrading = rebuild snes_offsets Release, copy,
+# commit the bump.
+!lib/SNES.dll
 
 # Visual Studio / Rider
 .vs/

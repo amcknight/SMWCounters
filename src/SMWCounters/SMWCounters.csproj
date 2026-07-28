@@ -10,7 +10,7 @@
     <!-- So Visual Studio's fast up-to-date check doesn't skip the post-build
          copy-to-Components step below (the CLI runs it every build regardless). -->
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
-    <Version>0.2.0</Version>
+    <Version>0.4.0</Version>
     <Company>Andrew McKnight</Company>
     <Product>LiveSplit SMW Counters</Product>
   </PropertyGroup>
@@ -40,6 +40,22 @@
     </Reference>
   </ItemGroup>
 
+  <!-- SNES.dll: structural WRAM discovery (snes_offsets project). Default is
+       the pinned binary in lib/ (committed; see .gitignore carve-out).
+       Private=true because LiveSplit does NOT provide this assembly — it must
+       ship next to SMWCounters.dll. Set SnesSrcPath in the gitignored
+       SMWCounters.local.props to build against ../snes_offsets source instead
+       (requires the sibling LiveSplit checkout that SNES.csproj references). -->
+  <ItemGroup Condition="'$(SnesSrcPath)' != ''">
+    <ProjectReference Include="$(SnesSrcPath)\src\SNES\SNES.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(SnesSrcPath)' == ''">
+    <Reference Include="SNES">
+      <HintPath>$(MSBuildThisFileDirectory)..\..\lib\SNES.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="PolySharp" Version="1.14.1" PrivateAssets="all" />
   </ItemGroup>
@@ -53,13 +69,23 @@
   <Import Project="$(MSBuildThisFileDirectory)SMWCounters.local.props" Condition="Exists('$(MSBuildThisFileDirectory)SMWCounters.local.props')" />
 
   <Target Name="CopyToLiveSplitComponents" AfterTargets="Build" Condition="Exists('$(ComponentsPath)')">
-    <!-- ContinueOnError: a running LiveSplit locks the loaded DLL; warn (close it)
-         instead of failing the build. Touch: stamp the copy time so a rebuild
-         visibly updates the file (Copy otherwise preserves the source mtime). -->
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ComponentsPath)" ContinueOnError="true" />
+    <!-- SMWCounters.dll and the SNES.dll it was built against deploy as a
+         pair so LiveSplit can never load a mismatched set. ContinueOnError:
+         a running LiveSplit locks loaded DLLs; warn (close it) instead of
+         failing the build. Touch: stamp the copy time so a rebuild visibly
+         updates the file. -->
+    <ItemGroup>
+      <_DeployPair Include="$(TargetPath);$(TargetDir)SNES.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_DeployPair)" DestinationFolder="$(ComponentsPath)" ContinueOnError="true">
+      <Output TaskParameter="CopiedFiles" ItemName="_DeployedDll" />
+    </Copy>
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ComponentsPath)" Condition="Exists('$(TargetDir)$(TargetName).pdb')" ContinueOnError="true" />
     <Touch Files="$(ComponentsPath)\$(TargetFileName)" ContinueOnError="true" />
-    <Message Importance="high" Text="SMWCounters: copied $(TargetFileName) to $(ComponentsPath)" />
+    <Message Condition="'@(_DeployedDll->Count())' == '@(_DeployPair->Count())'" Importance="high"
+             Text="SMWCounters: deployed @(_DeployedDll->'%(Filename)%(Extension)', ', ') -> $(ComponentsPath)" />
+    <Warning Condition="'@(_DeployedDll->Count())' != '@(_DeployPair->Count())'"
+             Text="Deployed only [@(_DeployedDll->'%(Filename)%(Extension)', ', ')] of the SMWCounters.dll+SNES.dll pair: LiveSplit likely has the rest locked. Close LiveSplit and rebuild." />
   </Target>
 
   <ItemGroup>
