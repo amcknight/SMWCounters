@@ -43,6 +43,7 @@ public class SmwCountersComponentSettings : UserControl
     private CheckBox chkResetOnSplitsReset;
     private CheckBox chkShowStatusDot;
     private CheckBox chkDebugLog;
+    private Label lblManyCounters;
     private Label lblStatus;
 
     private sealed class CounterRow
@@ -88,6 +89,7 @@ public class SmwCountersComponentSettings : UserControl
             {
                 SetEnabled(id, row.Enable.Checked);
                 SyncRowEnabled(row);
+                SyncManyCountersHint();
             };
             Controls.Add(row.Enable);
 
@@ -227,6 +229,18 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(chkDebugLog);
         y += 28;
 
+        lblManyCounters = new Label
+        {
+            Text = "Tip: if counters cut off, add a second SMW Counters component to the layout and split the counters between them.",
+            Location = new Point(10, y),
+            MaximumSize = new Size(440, 0),
+            AutoSize = true,
+            ForeColor = SystemColors.GrayText,
+        };
+        Controls.Add(lblManyCounters);
+        SyncManyCountersHint();
+        y += 34;
+
         lblStatus = new Label
         {
             Text = "(not polled yet)",
@@ -275,6 +289,15 @@ public class SmwCountersComponentSettings : UserControl
         if (row.CounterSpecific != null) { row.CounterSpecific.Enabled = on; }
     }
 
+    // The overlay renders counters in one fixed-height row; many enabled
+    // counters can outgrow the layout width (no wrap by design — mid-run
+    // digit growth would change component height). Nudge toward a second
+    // component instead.
+    private void SyncManyCountersHint()
+    {
+        if (lblManyCounters != null) { lblManyCounters.Visible = enabled.Count > 3; }
+    }
+
     // Re-syncs visible row widgets from the data model after SetSettings is called.
     public void RefreshFromModel()
     {
@@ -285,6 +308,7 @@ public class SmwCountersComponentSettings : UserControl
             SyncRowEnabled(row);
             row.RefreshExtras?.Invoke();
         }
+        SyncManyCountersHint();
         if (txtReset != null) { txtReset.Text = FormatKey(ResetKey); }
         if (trkHeight != null) { trkHeight.Value = Math.Max(trkHeight.Minimum, Math.Min(trkHeight.Maximum, RowHeight)); }
         if (rdoLeft != null)
