@@ -74,6 +74,7 @@ internal sealed class DebugLogger
     private readonly PreviousByte[] prevMouthFlag;
     private readonly PreviousByte prevSwallowTimer = new();
     private readonly Dictionary<string, int> lastValue = new();
+    private readonly StatusChangeFilter statusFilter = new();
     private StreamWriter writer;
 
     public string LogPath => logPath;
@@ -106,6 +107,21 @@ internal sealed class DebugLogger
         LogSpriteTransitions(mem);
     }
 
+    // Log SNES.dll status transitions ("SNS ..." lines): one line per change
+    // of (StateName, Generation, WramBase, IsCoolingDown, LastError), plus
+    // method/rebind provenance and scan latency on resolves. Called every
+    // tick while debug logging is enabled — including when the timer is not
+    // running, since always-on discovery transitions happen pre-run too.
+    public void LogStatus(SNES.EmuStatus status)
+    {
+        string line = statusFilter.OnStatus(
+            status.StateName, status.Generation, status.WramBase,
+            status.IsCoolingDown, status.LastError,
+            status.MethodName, status.RebindReasonName,
+            status.Diag != null ? status.Diag.ScanTotalMs : 0);
+        if (line != null) { Write(line); }
+    }
+
     // Clear edge-detection state without closing the file (pause / detach).
     public void Idle()
     {
@@ -124,6 +140,7 @@ internal sealed class DebugLogger
     public void Close()
     {
         Idle();
+        statusFilter.Reset();
         try { writer?.Dispose(); } catch { }
         writer = null;
     }
