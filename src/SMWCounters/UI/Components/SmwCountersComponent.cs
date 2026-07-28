@@ -266,7 +266,7 @@ public class SmwCountersComponent : IComponent
         try { Settings.Hook?.Poll(); } catch { }
 
         cache.Restart();
-        cache["dot"] = connection.DotColor.ToArgb();
+        cache["dot"] = Settings.ShowStatusDot ? connection.DotColor.ToArgb() : 0;
         foreach (ISmwCounter c in counters)
         {
             if (!Settings.IsEnabled(c.Id)) { continue; }
@@ -326,10 +326,13 @@ public class SmwCountersComponent : IComponent
         // Status square: a tiny connection-health indicator pinned to the
         // component's top-left corner, outside the row flow so it stays put
         // regardless of counter layout or alignment.
-        const float dotSize = 4f;
-        using (var dotBrush = new SolidBrush(connection.DotColor))
+        if (Settings.ShowStatusDot)
         {
-            g.FillRectangle(dotBrush, 1f, 1f, dotSize, dotSize);
+            const float dotSize = 5f;
+            using (var dotBrush = new SolidBrush(connection.DotColor))
+            {
+                g.FillRectangle(dotBrush, 3f, 1f, dotSize, dotSize);
+            }
         }
 
         foreach (ISmwCounter c in enabled)

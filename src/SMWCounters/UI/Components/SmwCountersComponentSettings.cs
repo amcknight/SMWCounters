@@ -25,6 +25,7 @@ public class SmwCountersComponentSettings : UserControl
     public HAlignment Alignment { get; set; } = HAlignment.Center;
     public bool ResetOnSplitsReset { get; set; } = true;
     public bool DebugLog { get; set; } = false;
+    public bool ShowStatusDot { get; set; } = true;
 
     public SmwCountersComponentSettings(bool allowGamepads)
     {
@@ -40,6 +41,7 @@ public class SmwCountersComponentSettings : UserControl
     private RadioButton rdoCenter;
     private RadioButton rdoRight;
     private CheckBox chkResetOnSplitsReset;
+    private CheckBox chkShowStatusDot;
     private CheckBox chkDebugLog;
     private Label lblStatus;
 
@@ -203,6 +205,17 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(chkResetOnSplitsReset);
         y += 28;
 
+        chkShowStatusDot = new CheckBox
+        {
+            Text = "Show connection status pixel",
+            Location = new Point(10, y),
+            AutoSize = true,
+            Checked = ShowStatusDot,
+        };
+        chkShowStatusDot.CheckedChanged += (_, __) => ShowStatusDot = chkShowStatusDot.Checked;
+        Controls.Add(chkShowStatusDot);
+        y += 28;
+
         chkDebugLog = new CheckBox
         {
             Text = "Debug: log counter + sprite events to file",
@@ -281,6 +294,7 @@ public class SmwCountersComponentSettings : UserControl
             rdoRight.Checked = Alignment == HAlignment.Right;
         }
         if (chkResetOnSplitsReset != null) { chkResetOnSplitsReset.Checked = ResetOnSplitsReset; }
+        if (chkShowStatusDot != null) { chkShowStatusDot.Checked = ShowStatusDot; }
         if (chkDebugLog != null) { chkDebugLog.Checked = DebugLog; }
         RegisterHotKeys();
     }
@@ -427,6 +441,7 @@ public class SmwCountersComponentSettings : UserControl
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
         ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], true);
         DebugLog = SettingsHelper.ParseBool(e["DebugLog"], false);
+        ShowStatusDot = SettingsHelper.ParseBool(e["ShowStatusDot"], true);
 
         enabled.Clear();
         XmlElement enabledNode = e["EnabledCounters"];
@@ -461,6 +476,7 @@ public class SmwCountersComponentSettings : UserControl
         hash ^= SettingsHelper.CreateSetting(document, parent, "Alignment", Alignment.ToString());
         hash ^= SettingsHelper.CreateSetting(document, parent, "ResetOnSplitsReset", ResetOnSplitsReset);
         hash ^= SettingsHelper.CreateSetting(document, parent, "DebugLog", DebugLog);
+        hash ^= SettingsHelper.CreateSetting(document, parent, "ShowStatusDot", ShowStatusDot);
 
         if (document != null && parent != null)
         {

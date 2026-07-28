@@ -13,16 +13,6 @@ namespace LiveSplit.SmwCounters.Snes;
 // Exceptions are control flow, not telemetry: messages are never parsed.
 internal sealed class SnesConnection : ISnesMemory
 {
-    // Mirrors ../kaizosplits/Kaizo.asl's state() declarations, in order.
-    // The kaizosplits autosplitter is the source of truth for this list so
-    // both components always attach to the same emulator process — do not
-    // reorder or extend without changing Kaizo.asl first.
-    private static readonly string[] ProcessNames =
-    {
-        "snes9x", "snes9x-x64", "bsnes", "retroarch", "higan",
-        "snes9x-rr", "mesen", "emuhawk", "ares", "mednafen",
-    };
-
     // Process enumeration is comparatively expensive; at the 15 ms poll rate
     // an unthrottled scan would run ~66x/sec while no emulator is open.
     private const int AcquireIntervalMs = 1000;
@@ -62,7 +52,7 @@ internal sealed class SnesConnection : ISnesMemory
         if (process == null && acquireClock.ElapsedMilliseconds - lastAcquireMs >= AcquireIntervalMs)
         {
             lastAcquireMs = acquireClock.ElapsedMilliseconds;
-            process = FindEmulatorProcess();
+            process = EmulatorProcessFinder.Find();
             if (process != null)
             {
                 emu.Attach(process);
@@ -149,20 +139,4 @@ internal sealed class SnesConnection : ISnesMemory
 
     private static string ErrorSuffix(EmuStatus s)
         => string.IsNullOrEmpty(s.LastError) ? "" : $" — {s.LastError}";
-
-    private static Process FindEmulatorProcess()
-    {
-        foreach (string name in ProcessNames)
-        {
-            Process[] found = Process.GetProcessesByName(name);
-            Process alive = null;
-            foreach (Process p in found)
-            {
-                if (alive == null && !p.HasExited) { alive = p; }
-                else { p.Dispose(); }
-            }
-            if (alive != null) { return alive; }
-        }
-        return null;
-    }
 }
