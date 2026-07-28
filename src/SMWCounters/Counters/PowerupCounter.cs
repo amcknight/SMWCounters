@@ -13,14 +13,11 @@ internal sealed class PowerupCounter : BankedCounter
     private const int GameModeOffset = 0x0100;
     private const byte LevelMainMode = 0x14;
     private const int PlayerAnimationOffset = 0x0071;
-    private const int MidwayOffset = 0x13CE;
-    private const int ExitsCompletedOffset = 0x1F2E;
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.mushroom.png");
 
     private readonly PreviousByte previousCollectAnim = new();
-    private readonly PreviousByte previousMidway = new();
-    private readonly PreviousByte previousExits = new();
+    private readonly MidwayExitBankDetector bank = new();
 
     public override string Id => "powerups";
     public override Image DefaultIcon => icon;
@@ -47,34 +44,11 @@ internal sealed class PowerupCounter : BankedCounter
         return got ? 1 : 0;
     }
 
-    protected override bool DetectBank(ISnesMemory memory)
-    {
-        bool banked = false;
-
-        if (memory.ReadWramByte(MidwayOffset, out byte midway))
-        {
-            if (previousMidway.HasPrevious && midway == 1 && previousMidway.Value != 1)
-            {
-                banked = true;
-            }
-            previousMidway.Set(midway);
-        }
-        else { previousMidway.Clear(); }
-
-        if (memory.ReadWramByte(ExitsCompletedOffset, out byte exits))
-        {
-            if (previousExits.HasPrevious && exits > previousExits.Value) { banked = true; }
-            previousExits.Set(exits);
-        }
-        else { previousExits.Clear(); }
-
-        return banked;
-    }
+    protected override bool DetectBank(ISnesMemory memory) => bank.DetectBank(memory);
 
     protected override void ClearDetectors()
     {
         previousCollectAnim.Clear();
-        previousMidway.Clear();
-        previousExits.Clear();
+        bank.Clear();
     }
 }
