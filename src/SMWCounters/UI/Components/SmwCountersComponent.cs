@@ -72,6 +72,7 @@ public class SmwCountersComponent : IComponent
             moon,
             new JumpCounter(),
             new PowerupCounter(),
+            new CoinCounter(),
             new KillCounter(),
         };
 
@@ -130,7 +131,7 @@ public class SmwCountersComponent : IComponent
             Action refresh = () => chk.Checked = moon.DedupeMode == MoonDedupeMode.PerLevel;
             return (panel, refresh);
         }
-        if (counter is PowerupCounter)
+        if (counter is PowerupCounter or CoinCounter)
         {
             var chk = new CheckBox
             {
@@ -140,7 +141,7 @@ public class SmwCountersComponent : IComponent
                 Location = new Point(0, 4),
             };
             chk.CheckedChanged += (_, __) => Settings.SetBankOnSave(counter.Id, chk.Checked);
-            extrasToolTip.SetToolTip(chk, "Unbanked powerups (shown gold) are discarded if you die before a checkpoint or exit.");
+            extrasToolTip.SetToolTip(chk, "Unbanked collects (shown gold) are discarded if you die before a checkpoint or exit.");
             var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
             panel.Controls.Add(chk);
             Action refresh = () => chk.Checked = Settings.IsBankOnSave(counter.Id);
@@ -237,7 +238,7 @@ public class SmwCountersComponent : IComponent
         // state, so a mid-run detach can't bridge stale samples on reattach.
         foreach (ISmwCounter c in counters)
         {
-            if (c is PowerupCounter pc) { pc.Banked = Settings.IsBankOnSave(c.Id); }
+            if (c is PowerupCounter or CoinCounter) { ((BankedCounter)c).Banked = Settings.IsBankOnSave(c.Id); }
             if (Settings.IsEnabled(c.Id)) { c.Poll(connection); }
         }
 
