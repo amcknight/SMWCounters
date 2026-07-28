@@ -8,7 +8,13 @@ first within each group.
 
 - **Yoshi as a powerup.** Whether/how having Yoshi counts toward a low% /
   "least powerups" tally. Unresolved design (like the powerup-collect debate);
-  needs a rule that's clean and ungameable.
+  needs a rule that's clean and ungameable. Direction sketched 2026-07-27:
+  opt-in via a checkbox alongside the other powerup toggles. Easiest rule is
+  **count each mount**; ideal rule dedupes remounts of the *same* Yoshi
+  (identity via sprite slot? fragile across slot reuse) so hop-off/hop-on isn't
+  double-counted, while a respawned Yoshi legitimately counts as a second.
+  Needs a live observation session on Yoshi identity/slot behavior before any
+  design.
 - **Checkpoint (midway) as a powerup.** A midway that makes Mario big is
   effectively a powerup, but it does **not** currently increment the Powerups
   counter — the collect fires on the `$0071` grow *animation* (→2/3/4), and the
@@ -84,9 +90,13 @@ first within each group.
 ## UI / UX
 
 - **Overflow handling.** When the enabled counters are wider than the available
-  layout width, either **wrap to a second line** (preferred; keeps chosen size)
-  or **shrink to fit** (one-line look). Propose wrap-by-default with a
-  "shrink instead of wrap" toggle. Touches `DrawGeneral` layout math.
+  layout width, either wrap to a second line or shrink to fit. **Decided
+  against for v0.5.0 (2026-07-27):** counter widths grow mid-run as digit
+  counts grow, so wrap would change the component's *height* mid-run —
+  confusing and annoying in a LiveSplit layout. If ever revisited, it needs
+  pre-emptively locked digit widths per counter. Chosen mitigation instead: a
+  settings hint when many counters are enabled, suggesting a second
+  SMWCounters instance stacked in the layout (ships in v0.5.0).
 - **Save/restore counter values for restarting a run.** Ideas floated: recover
   the last values after a Reset/close — e.g. show the previous values greyed in
   Settings with a "Recover" button, and/or expose it via right-click. Design
