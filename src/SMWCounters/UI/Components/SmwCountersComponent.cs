@@ -298,11 +298,6 @@ public class SmwCountersComponent : IComponent
         // aspect ratio, so a 16x24 sprite renders taller-than-wide.
         int iconHeight = (int)Math.Round(0.85f * Settings.RowHeight);
 
-        // Status dot: a small connection-health LED leading the row. Size
-        // tracks the row so layout scaling keeps it visible but subtle.
-        float dotDiameter = Math.Max(4f, 0.25f * Settings.RowHeight);
-        const float dotGap = 6f;
-
         // Measure each enabled counter's cell width: label-slot + " " + value.
         // Label slot is icon-aspect-scaled when the counter has an icon, else default-label text width.
         var enabled = counters.Where(c => Settings.IsEnabled(c.Id)).ToList();
@@ -319,7 +314,6 @@ public class SmwCountersComponent : IComponent
             totalWidth += labelW + 4 + valueW;
         }
 
-        totalWidth += dotDiameter + dotGap;
         HorizontalWidth = totalWidth + 15;
 
         float x = Settings.Alignment switch
@@ -328,14 +322,16 @@ public class SmwCountersComponent : IComponent
             HAlignment.Right  => Math.Max(5f, width - totalWidth - 5f),
             _                 => 5f,
         };
-        SmoothingMode prevSmoothing = g.SmoothingMode;
-        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+        // Status square: a tiny connection-health indicator pinned to the
+        // component's top-left corner, outside the row flow so it stays put
+        // regardless of counter layout or alignment.
+        const float dotSize = 4f;
         using (var dotBrush = new SolidBrush(connection.DotColor))
         {
-            g.FillEllipse(dotBrush, x, (height - dotDiameter) / 2f, dotDiameter, dotDiameter);
+            g.FillRectangle(dotBrush, 1f, 1f, dotSize, dotSize);
         }
-        g.SmoothingMode = prevSmoothing;
-        x += dotDiameter + dotGap;
+
         foreach (ISmwCounter c in enabled)
         {
             (float labelW, float valueW) = cellWidths[c.Id];

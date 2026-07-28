@@ -11,7 +11,9 @@ internal sealed class StatusChangeFilter
 
     public string OnStatus(string stateName, int generation, long wramBase,
                            bool isCoolingDown, string lastError,
-                           string methodName, string rebindReasonName, long scanTotalMs)
+                           string methodName, string rebindReasonName,
+                           int rivalCount, bool isContested, int regressionCount,
+                           long scanTotalMs)
     {
         lastError = lastError ?? "";
         string key = $"{stateName}|{generation}|{wramBase}|{isCoolingDown}|{lastError}";
@@ -20,6 +22,9 @@ internal sealed class StatusChangeFilter
 
         string line = $"SNS state={stateName} gen={generation} base=0x{wramBase:X}"
             + $" method={methodName} rebind={rebindReasonName}"
+            + (rivalCount > 0 ? $" rivals={rivalCount}" : "")
+            + (isContested ? " contested" : "")
+            + (regressionCount > 0 ? $" reg={regressionCount}" : "")
             + (isCoolingDown ? " cooldown" : "")
             + (lastError.Length == 0 ? "" : $" err=\"{lastError}\"");
 
