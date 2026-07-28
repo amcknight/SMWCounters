@@ -26,10 +26,12 @@ moons**, and **powerups** — by reading SNES WRAM from your running emulator.
   [snes_offsets](https://github.com/amcknight/snes_offsets) project's
   `SNES.dll`), so there are no per-build offset tables to go stale and no
   configuration.
-- A colored **status dot** leads the counter row: green = connected to the
-  game (pale green = connected, identity unvouched), blue = discovering,
-  gray = searching (dim = no game running), orange = retrying shortly,
-  yellow = connected with rival candidates, red = no emulator found.
+- A tiny **status pixel** in the component's top-left corner shows connection
+  health at a glance: green = connected to the game (pale green = connected,
+  identity unvouched), blue = discovering, gray = searching (dim = no game
+  running), orange = retrying shortly, yellow = connected with rival
+  candidates (normal on RetroArch), red = no emulator found. Toggle it off in
+  Configuration if you don't want it.
 
 ## Configuration
 
@@ -47,6 +49,8 @@ Open the component's settings (Edit Layout → double-click **SMW Counters**):
   text label.
 - **Reset key** — a hotkey (keyboard or gamepad) that zeroes the counters.
 - **Reset on splits reset** — clear counters whenever the run resets.
+- **Show connection status pixel** — toggle the top-left status pixel on/off.
+  On by default.
 - **Alignment** and **row height** for layout fit.
 
 ## Build from source

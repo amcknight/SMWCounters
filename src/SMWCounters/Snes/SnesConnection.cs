@@ -26,7 +26,7 @@ internal sealed class SnesConnection : ISnesMemory
 
     public SnesConnection()
     {
-        Status = emu.Status(); // Detached snapshot; Diag is never null
+        Status = emu.Status(); // Detached snapshot, so consumers never see null
     }
 
     public EmuStatus Status { get; private set; }
@@ -117,17 +117,17 @@ internal sealed class SnesConnection : ISnesMemory
         string proc = process != null ? process.ProcessName : "?";
         switch (s.StateName)
         {
-            case "Detached":
+            case SnesState.Detached:
                 return "No emulator found";
-            case "NoContent":
+            case SnesState.NoContent:
                 return $"{proc} · no game detected{CooldownSuffix(s)}";
-            case "Searching":
+            case SnesState.Searching:
                 return $"{proc} · searching for game{CooldownSuffix(s)}{ErrorSuffix(s)}";
-            case "Discovering":
+            case SnesState.Discovering:
                 return $"{proc} · discovering WRAM…";
-            case "Resolved":
-            case "Held":
-            case "Degraded":
+            case SnesState.Resolved:
+            case SnesState.Held:
+            case SnesState.Degraded:
                 return $"{proc} · WRAM @ 0x{s.WramBase:X} ({s.MethodName})";
             default:
                 return $"{proc} · {s.StateName}";

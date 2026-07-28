@@ -29,18 +29,18 @@ internal static class StatusDot
     {
         switch (stateName)
         {
-            case "Resolved":
-            case "Held":
+            case SnesState.Resolved:
+            case SnesState.Held:
                 return witnessVerdict == "Real" && witnessBase == wramBase ? Green : PaleGreen;
-            case "Degraded":
+            case SnesState.Degraded:
                 return Yellow;
-            case "Detached":
+            case SnesState.Detached:
                 return Red;
-            case "Discovering":
+            case SnesState.Discovering:
                 return isCoolingDown ? Orange : Blue;
-            case "Searching":
+            case SnesState.Searching:
                 return isCoolingDown ? Orange : Gray;
-            case "NoContent":
+            case SnesState.NoContent:
                 return isCoolingDown ? Orange : DimGray;
             default:
                 return Gray; // unknown future state: render as idle searching

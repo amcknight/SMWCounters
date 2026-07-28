@@ -323,7 +323,7 @@ public class SmwCountersComponent : IComponent
             _                 => 5f,
         };
 
-        // Status square: a tiny connection-health indicator pinned to the
+        // Status pixel: a tiny connection-health indicator pinned to the
         // component's top-left corner, outside the row flow so it stays put
         // regardless of counter layout or alignment.
         if (Settings.ShowStatusDot)

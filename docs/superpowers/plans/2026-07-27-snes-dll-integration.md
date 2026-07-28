@@ -1097,3 +1097,12 @@ Use the superpowers:finishing-a-development-branch skill: merge
 - **Spec coverage:** decisions 1–6 map to Tasks 5/7 (replacement, always-on, process list), 7 (dot placement), 1–2 (pinned lib DLL + dev mode), 3 (mapper). Throttle → Task 5 (`AcquireIntervalMs`). Logging idiom → Tasks 4/6. Packaging/release → Tasks 1/2/8. Edge cases → SnesConnection/Poll comments + live gate. Testing/merge gate → Task 9.
 - **Placeholder scan:** all code blocks are complete implementations; no TBDs.
 - **Type consistency:** `StatusDot.ColorFor(string, bool, string, long, long)` used identically in Tasks 3 and 5; `StatusChangeFilter.OnStatus(string, int, long, bool, string, string, string, long)` identical in Tasks 4 and 6; `SnesConnection` members consumed in Task 7 match Task 5's definitions (`Tick`, `Status`, `DotColor`, `Describe`, `IsAttached`, `ReadWramByte`).
+- **Post-plan deviations (live-gate feedback, commits `fa7f0ee`/`4abf5a0` +
+  wrap):** `SnesConnection`'s inline `FindEmulatorProcess()` (Task 5) shipped
+  as a standalone `EmulatorProcessFinder.cs`. The indicator (Task 7) shipped
+  as a fixed 5×5 px square pinned to the top-left corner instead of a
+  `max(4f, 0.25f×RowHeight)` ellipse leading the row, and gained a
+  `ShowStatusDot` settings toggle not in this plan.
+  `StatusChangeFilter.OnStatus` (Tasks 4/6) gained three payload parameters
+  (`rivalCount`, `isContested`, `regressionCount`) beyond those documented
+  here.

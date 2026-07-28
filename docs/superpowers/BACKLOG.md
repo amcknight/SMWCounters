@@ -4,24 +4,6 @@ Running list of ideas and unfinished threads, captured at the v0.2.0 cut. Not
 scheduled — a parking lot to pull from. Grouped by theme, roughly high-impact
 first within each group.
 
-## Architecture / blockers for 1.0
-
-- **SNESOffset detection.** The offset/attach tables are ported verbatim from
-  kaizosplits and duplicated here. **Plan:** incorporate a generic `SNES.dll`
-  memory/offset layer from another project — one source of truth that detects
-  emulator + core + version robustly and finds WRAM across all emulators. This
-  is the gate for calling this **1.0**; until then we stay on 0.x, and it is the
-  main reason 1.0 is deferred. Adopting it also subsumes the whole
-  `Offsets`/`SnesEmu` attach path here.
-- **Mesen support comes via the generic `SNES.dll`.** Mesen (Mesen2, process
-  `Mesen.exe`) is not supported today — it is absent from
-  `Offsets.KnownProcessNames`
-  (`retroarch`/`snes9x`/`snes9x-x64`/`snes9x-rr`/`bsnes`/`higan`/`emuhawk`) and
-  has no WRAM offsets, so the component reports "no emulator found" and never
-  attaches. This is **not** a standalone offset-research task in this repo: Mesen
-  (and any other emulator) is expected to work once the generic `SNES.dll` layer
-  above is adopted. Do not hand-roll per-version Mesen offsets here.
-
 ## Counting semantics (SMW judgment calls)
 
 - **Yoshi as a powerup.** Whether/how having Yoshi counts toward a low% /

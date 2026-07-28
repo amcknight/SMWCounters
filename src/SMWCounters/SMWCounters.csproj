@@ -82,9 +82,9 @@
     </Copy>
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ComponentsPath)" Condition="Exists('$(TargetDir)$(TargetName).pdb')" ContinueOnError="true" />
     <Touch Files="$(ComponentsPath)\$(TargetFileName)" ContinueOnError="true" />
-    <Message Condition="'@(_DeployedDll->Count())' == '2'" Importance="high"
+    <Message Condition="'@(_DeployedDll->Count())' == '@(_DeployPair->Count())'" Importance="high"
              Text="SMWCounters: deployed @(_DeployedDll->'%(Filename)%(Extension)', ', ') -> $(ComponentsPath)" />
-    <Warning Condition="'@(_DeployedDll->Count())' != '2'"
+    <Warning Condition="'@(_DeployedDll->Count())' != '@(_DeployPair->Count())'"
              Text="Deployed only [@(_DeployedDll->'%(Filename)%(Extension)', ', ')] of the SMWCounters.dll+SNES.dll pair: LiveSplit likely has the rest locked. Close LiveSplit and rebuild." />
   </Target>
 

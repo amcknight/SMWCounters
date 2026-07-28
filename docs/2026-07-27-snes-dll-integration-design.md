@@ -2,6 +2,18 @@
 
 **Date:** 2026-07-27 · **Target version:** 0.3.0 · **Branch:** `feat/snes-dll-discovery`
 
+> **Post-live-gate amendment (same branch, later commits):** the indicator in
+> Decision 4 and the `DrawGeneral()` section below shipped differently after
+> live-gate feedback: it is a fixed 5×5 px "status pixel" pinned to the
+> component's top-left corner (outside the row/alignment flow), with a
+> `ShowStatusDot` settings toggle (default on) — not a `max(4px,
+> 0.25×RowHeight)` dot leading the counter row. `SnesConnection`'s process
+> lookup was also extracted into a standalone `EmulatorProcessFinder` class
+> (a deliberately liftable unit for future plugins), and the debug log's SNS
+> payload gained `rivals=`/`contested`/`reg=` fields. See
+> `SmwCountersComponent.DrawGeneral()`, `Snes/EmulatorProcessFinder.cs`, and
+> `ShowStatusDot` in `SmwCountersComponentSettings.cs` for as-shipped behavior.
+
 ## Goal
 
 Replace the ported kaizosplits offset tables (`Snes/SnesEmu.cs` + `Snes/Offsets.cs`)

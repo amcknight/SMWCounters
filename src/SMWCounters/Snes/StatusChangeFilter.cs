@@ -12,8 +12,9 @@ internal sealed class StatusChangeFilter
     public string OnStatus(string stateName, int generation, long wramBase,
                            bool isCoolingDown, string lastError,
                            string methodName, string rebindReasonName,
-                           int rivalCount, bool isContested, int regressionCount,
-                           long scanTotalMs)
+                           long scanTotalMs,
+                           int rivalCount = 0, bool isContested = false,
+                           int regressionCount = 0)
     {
         lastError = lastError ?? "";
         string key = $"{stateName}|{generation}|{wramBase}|{isCoolingDown}|{lastError}";
@@ -28,8 +29,7 @@ internal sealed class StatusChangeFilter
             + (isCoolingDown ? " cooldown" : "")
             + (lastError.Length == 0 ? "" : $" err=\"{lastError}\"");
 
-        bool resolvedFamily = stateName == "Resolved" || stateName == "Degraded" || stateName == "Held";
-        if (resolvedFamily && scanTotalMs > 0)
+        if (SnesState.IsResolvedFamily(stateName) && scanTotalMs > 0)
         {
             line += $" scanMs={scanTotalMs}";
         }

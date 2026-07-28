@@ -118,8 +118,8 @@ internal sealed class DebugLogger
             status.StateName, status.Generation, status.WramBase,
             status.IsCoolingDown, status.LastError,
             status.MethodName, status.RebindReasonName,
-            status.RivalCount, status.IsContested, status.RegressionCount,
-            status.Diag != null ? status.Diag.ScanTotalMs : 0);
+            status.Diag != null ? status.Diag.ScanTotalMs : 0,
+            status.RivalCount, status.IsContested, status.RegressionCount);
         if (line != null) { Write(line); }
     }
 
