@@ -23,5 +23,5 @@ public class SmwCountersComponentFactory : IComponentFactory
 
     public string UpdateURL => string.Empty;
 
-    public Version Version => Version.Parse("0.4.0");
+    public Version Version => Version.Parse("0.5.0");
 }
