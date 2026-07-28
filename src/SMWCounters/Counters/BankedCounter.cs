@@ -7,7 +7,7 @@ using LiveSplit.UI;
 namespace LiveSplit.SmwCounters.Counters;
 
 // Shared "collect, then bank or discard-on-death" counter.
-//   collect => total++            (subclass DetectCollect)
+//   collect => total += delta     (subclass DetectCollectDelta)
 //   die     => total = saved      (default: $0071 rising-edge to 9)
 //   bank    => saved = total      (subclass DetectBank)
 // Value shows total; ValueIsAlert is true while total != saved (unbanked).
@@ -62,7 +62,8 @@ internal abstract class BankedCounter : ISmwCounter
         if (!Banked && total != saved) { saved = total; }
 
         if (DetectDeath(memory)) { total = saved; }
-        if (DetectCollect(memory)) { total++; if (!Banked) { saved = total; } }
+        int delta = DetectCollectDelta(memory);
+        if (delta > 0) { total += delta; if (!Banked) { saved = total; } }
         if (DetectBank(memory)) { saved = total; }
     }
 
@@ -80,7 +81,9 @@ internal abstract class BankedCounter : ISmwCounter
         return died;
     }
 
-    protected abstract bool DetectCollect(ISnesMemory memory);
+    // Number of collects detected this poll (0 = none). Most counters are
+    // 0/1 edge detectors; coins arrive as multi-unit deltas.
+    protected abstract int DetectCollectDelta(ISnesMemory memory);
     protected abstract bool DetectBank(ISnesMemory memory);
     protected abstract void ClearDetectors();
 

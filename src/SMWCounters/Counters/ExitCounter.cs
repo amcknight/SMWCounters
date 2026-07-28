@@ -28,7 +28,7 @@ internal sealed class ExitCounter : BankedCounter
     public override string DefaultLabel => "Exits";
     protected override string SaveName => "Exits";
 
-    protected override bool DetectCollect(ISnesMemory memory)
+    protected override int DetectCollectDelta(ISnesMemory memory)
     {
         if (!memory.ReadWramByte(FanfareOffset, out byte fanfare)
             || !memory.ReadWramByte(IoOffset, out byte io)
@@ -36,7 +36,7 @@ internal sealed class ExitCounter : BankedCounter
         {
             previousFanfare.Clear();
             previousIo.Clear();
-            return false;
+            return 0;
         }
 
         // StepTo(fanfare, 1): 0 -> 1 this poll.
@@ -53,7 +53,7 @@ internal sealed class ExitCounter : BankedCounter
 
         previousFanfare.Set(fanfare);
         previousIo.Set(io);
-        return goal || orb || key || boss;
+        return goal || orb || key || boss ? 1 : 0;
     }
 
     protected override bool DetectBank(ISnesMemory memory)

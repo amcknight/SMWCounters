@@ -27,24 +27,24 @@ internal sealed class PowerupCounter : BankedCounter
     public override string DefaultLabel => "Powerups";
     protected override string SaveName => "Powerups";
 
-    protected override bool DetectCollect(ISnesMemory memory)
+    protected override int DetectCollectDelta(ISnesMemory memory)
     {
         // Gate to in-level so overworld/load/garbage animation values don't count.
         if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
         {
             previousCollectAnim.Clear();
-            return false;
+            return 0;
         }
         if (!memory.ReadWramByte(PlayerAnimationOffset, out byte anim))
         {
             previousCollectAnim.Clear();
-            return false;
+            return 0;
         }
         bool got = previousCollectAnim.HasPrevious
             && anim != previousCollectAnim.Value
             && (anim == 2 || anim == 3 || anim == 4);
         previousCollectAnim.Set(anim);
-        return got;
+        return got ? 1 : 0;
     }
 
     protected override bool DetectBank(ISnesMemory memory)
