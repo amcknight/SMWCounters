@@ -8,10 +8,11 @@ moons**, and **powerups** — by reading SNES WRAM from your running emulator.
 
 ## Install
 
-1. Download `SMWCounters.dll` from the
-   [latest release](https://github.com/amcknight/SMWCounters/releases/latest).
-2. Copy it into the `Components` folder inside your LiveSplit install
-   (e.g. `LiveSplit/Components/`).
+1. Download `SMWCounters.dll` **and** `SNES.dll` from the
+   [latest release](https://github.com/amcknight/SMWCounters/releases/latest)
+   (the release zip contains both).
+2. Copy **both DLLs** into the `Components` folder inside your LiveSplit
+   install (e.g. `LiveSplit/Components/`).
 3. Start LiveSplit → right-click → **Edit Layout…** → **+** → **Other →
    SMW Counters**.
 4. Save the layout.
@@ -19,11 +20,16 @@ moons**, and **powerups** — by reading SNES WRAM from your running emulator.
 ## Requirements
 
 - **LiveSplit** 1.8.37 or newer.
-- A running, supported SNES emulator with *Super Mario World* loaded:
-  RetroArch, snes9x (including `snes9x-x64` and `snes9x-rr`), bsnes, higan, or
-  BizHawk.
-- Counting only happens while the LiveSplit timer is running or paused, so the
-  title screen / file select / demos don't pollute the counts.
+- A running SNES emulator with *Super Mario World* loaded: RetroArch, snes9x
+  (any variant), bsnes, higan, Mesen, BizHawk, ares, or Mednafen — **any
+  version**. WRAM is discovered structurally (via the
+  [snes_offsets](https://github.com/amcknight/snes_offsets) project's
+  `SNES.dll`), so there are no per-build offset tables to go stale and no
+  configuration.
+- A colored **status dot** leads the counter row: green = connected to the
+  game (pale green = connected, identity unvouched), blue = discovering,
+  gray = searching (dim = no game running), orange = retrying shortly,
+  yellow = connected with rival candidates, red = no emulator found.
 
 ## Configuration
 
@@ -60,7 +66,9 @@ automatically.
 
 ## Credits & license
 
-Code is MIT-licensed (see [LICENSE](LICENSE)). Emulator/offset research is
-ported from [kaizosplits](https://github.com/amcknight/kaizosplits). *Super
+Code is MIT-licensed (see [LICENSE](LICENSE)). WRAM discovery is powered by
+[snes_offsets](https://github.com/amcknight/snes_offsets) (`SNES.dll`);
+earlier releases used offset tables ported from
+[kaizosplits](https://github.com/amcknight/kaizosplits). *Super
 Mario World* sprites are Nintendo's, used as fan iconography — see
 [CREDITS.md](CREDITS.md).

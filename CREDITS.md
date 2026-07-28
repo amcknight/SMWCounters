@@ -12,12 +12,16 @@ fan-community speedrunning iconography for their respective counters:
 - `jump.png` &mdash; jump counter (Mario jumping sprite)
 - `mushroom.png` &mdash; powerups counter (Super Mushroom sprite)
 
-## Offset research
+## WRAM discovery
 
-Emulator detection and the SNES WRAM offset tables were ported from
+`lib/SNES.dll` (pinned v1.6.0) comes from the author's
+[snes_offsets](https://github.com/amcknight/snes_offsets) project: structural
+SNES WRAM discovery for LiveSplit consumers — no offset tables, reads only.
+
+Earlier releases used emulator-detection and WRAM offset tables ported from
 [kaizosplits](https://github.com/amcknight/kaizosplits) (the author's own
-earlier LiveSplit SMW project). All credit for the original offset research
-belongs to that project.
+earlier LiveSplit SMW project); credit for that original offset research
+belongs to that project and its upstream sources.
 
 ## Licensing note
 
