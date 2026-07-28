@@ -20,7 +20,7 @@ public class SmwCountersComponent : IComponent
 
     private readonly LiveSplitState state;
     private readonly Timer pollTimer;
-    private readonly SnesEmu emu = new();
+    private readonly SnesConnection connection = new();
     private readonly DebugLogger debugLog = new();
 
     // Shared "always detached" memory used to flush per-counter edge state
@@ -203,10 +203,18 @@ public class SmwCountersComponent : IComponent
 
     private void Poll()
     {
-        // Only count during a live run. NotRunning covers title screen / file
-        // select / overworld-before-start (where SMW demos and casual play
-        // would otherwise pollute the counter); Ended covers post-run idle.
-        // Paused counts as active so a pause/resume preserves edge continuity.
+        // Always-on discovery: the connection ticks every poll regardless of
+        // timer phase, so the status dot is already green when a run starts
+        // (structural discovery takes seconds; gating it on the timer would
+        // lose the first seconds of counting).
+        connection.Tick();
+        if (Settings.DebugLog) { debugLog.LogStatus(connection.Status); }
+
+        // Counters still only count during a live run. NotRunning covers
+        // title screen / file select / overworld-before-start (where SMW
+        // demos and casual play would otherwise pollute the counter); Ended
+        // covers post-run idle. Paused counts as active so a pause/resume
+        // preserves edge continuity.
         bool timerActive = state.CurrentPhase == TimerPhase.Running
             || state.CurrentPhase == TimerPhase.Paused;
 
@@ -220,32 +228,36 @@ public class SmwCountersComponent : IComponent
                 if (Settings.IsEnabled(c.Id)) { c.Poll(inert); }
             }
             debugLog.Idle();
-            Settings.SetStatus("Paused · timer not running");
+            Settings.SetStatus("Paused · timer not running · " + connection.Describe());
             return;
         }
 
-        if (!emu.TryAttach())
-        {
-            debugLog.Idle();
-            Settings.SetStatus(emu.LastError ?? "No emulator found");
-            return;
-        }
+        // Poll counters against the live connection even when it is not
+        // (yet) attached: each counter's !IsAttached branch flushes its edge
+        // state, so a mid-run detach can't bridge stale samples on reattach.
         foreach (ISmwCounter c in counters)
         {
             if (c is PowerupCounter pc) { pc.Banked = Settings.IsBankOnSave(c.Id); }
-            if (Settings.IsEnabled(c.Id)) { c.Poll(emu); }
+            if (Settings.IsEnabled(c.Id)) { c.Poll(connection); }
+        }
+
+        if (!connection.IsAttached)
+        {
+            debugLog.Idle();
+            Settings.SetStatus(connection.Describe());
+            return;
         }
 
         if (Settings.DebugLog)
         {
-            debugLog.Poll(emu, counters, id => Settings.IsEnabled(id),
-                          state.CurrentPhase.ToString(), emu.Describe());
-            Settings.SetStatus("Counting · " + emu.Describe() + " · debug log → " + debugLog.LogPath);
+            debugLog.Poll(connection, counters, id => Settings.IsEnabled(id),
+                          state.CurrentPhase.ToString(), connection.Describe());
+            Settings.SetStatus("Counting · " + connection.Describe() + " · debug log → " + debugLog.LogPath);
         }
         else
         {
             debugLog.Close();
-            Settings.SetStatus("Counting · " + emu.Describe());
+            Settings.SetStatus("Counting · " + connection.Describe());
         }
     }
 
@@ -254,6 +266,7 @@ public class SmwCountersComponent : IComponent
         try { Settings.Hook?.Poll(); } catch { }
 
         cache.Restart();
+        cache["dot"] = connection.DotColor.ToArgb();
         foreach (ISmwCounter c in counters)
         {
             if (!Settings.IsEnabled(c.Id)) { continue; }
@@ -285,6 +298,11 @@ public class SmwCountersComponent : IComponent
         // aspect ratio, so a 16x24 sprite renders taller-than-wide.
         int iconHeight = (int)Math.Round(0.85f * Settings.RowHeight);
 
+        // Status dot: a small connection-health LED leading the row. Size
+        // tracks the row so layout scaling keeps it visible but subtle.
+        float dotDiameter = Math.Max(4f, 0.25f * Settings.RowHeight);
+        const float dotGap = 6f;
+
         // Measure each enabled counter's cell width: label-slot + " " + value.
         // Label slot is icon-aspect-scaled when the counter has an icon, else default-label text width.
         var enabled = counters.Where(c => Settings.IsEnabled(c.Id)).ToList();
@@ -301,6 +319,7 @@ public class SmwCountersComponent : IComponent
             totalWidth += labelW + 4 + valueW;
         }
 
+        totalWidth += dotDiameter + dotGap;
         HorizontalWidth = totalWidth + 15;
 
         float x = Settings.Alignment switch
@@ -309,6 +328,14 @@ public class SmwCountersComponent : IComponent
             HAlignment.Right  => Math.Max(5f, width - totalWidth - 5f),
             _                 => 5f,
         };
+        SmoothingMode prevSmoothing = g.SmoothingMode;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using (var dotBrush = new SolidBrush(connection.DotColor))
+        {
+            g.FillEllipse(dotBrush, x, (height - dotDiameter) / 2f, dotDiameter, dotDiameter);
+        }
+        g.SmoothingMode = prevSmoothing;
+        x += dotDiameter + dotGap;
         foreach (ISmwCounter c in enabled)
         {
             (float labelW, float valueW) = cellWidths[c.Id];
