@@ -131,7 +131,7 @@ public class SmwCountersComponent : IComponent
             Action refresh = () => chk.Checked = moon.DedupeMode == MoonDedupeMode.PerLevel;
             return (panel, refresh);
         }
-        if (counter is PowerupCounter or CoinCounter)
+        if (counter is BankedCounter { HasBankToggle: true })
         {
             var chk = new CheckBox
             {
@@ -238,7 +238,7 @@ public class SmwCountersComponent : IComponent
         // state, so a mid-run detach can't bridge stale samples on reattach.
         foreach (ISmwCounter c in counters)
         {
-            if (c is PowerupCounter or CoinCounter) { ((BankedCounter)c).Banked = Settings.IsBankOnSave(c.Id); }
+            if (c is BankedCounter { HasBankToggle: true } bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }
             if (Settings.IsEnabled(c.Id)) { c.Poll(connection); }
         }
 

@@ -15,6 +15,15 @@ public class BankToggleTests
     }
 
     [Fact]
+    public void HasBankToggle_TrueForToggleCounters_FalseForExits()
+    {
+        Assert.True(new PowerupCounter().HasBankToggle);
+        Assert.True(new CoinCounter().HasBankToggle);
+        Assert.True(new JumpCounter().HasBankToggle);
+        Assert.False(new ExitCounter().HasBankToggle);
+    }
+
+    [Fact]
     public void BankedOn_Default_CollectAlertsThenDeathReverts()
     {
         var c = new PowerupCounter();               // Banked defaults to true

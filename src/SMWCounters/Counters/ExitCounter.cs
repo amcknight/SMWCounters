@@ -23,6 +23,8 @@ internal sealed class ExitCounter : BankedCounter
     private readonly PreviousByte previousIo = new();
     private readonly PreviousByte previousExits = new();
 
+    public override bool HasBankToggle => false;
+
     public override string Id => "exits";
     public override Image DefaultIcon => icon;
     public override string DefaultLabel => "Exits";

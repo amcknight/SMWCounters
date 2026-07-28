@@ -26,6 +26,11 @@ internal abstract class BankedCounter : ISmwCounter
     // per-counter "Bank on save" setting.
     public bool Banked { get; set; } = true;
 
+    // Whether the settings UI exposes a "Discard on death" checkbox for this
+    // counter (drives both the extras row and the per-poll Banked sync).
+    // Exits bank on the save write itself, so a toggle is meaningless there.
+    public virtual bool HasBankToggle => true;
+
     public abstract string Id { get; }
     public abstract Image DefaultIcon { get; }
     public abstract string DefaultLabel { get; }

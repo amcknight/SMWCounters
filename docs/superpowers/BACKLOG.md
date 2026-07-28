@@ -127,11 +127,6 @@ first within each group.
 - **Settings dialog is fixed-size** (not user-resizable). Minor; widen if it
   ever feels cramped.
 
-- **`HasBankToggle` before counter #3.** The "has a Discard-on-death toggle"
-  concept is encoded as `c is PowerupCounter or CoinCounter` in two places in
-  `SmwCountersComponent` (Poll wiring + BuildExtras). Fine at two types; a
-  third banked-toggle counter should collapse both sites into a
-  `virtual bool HasBankToggle` on `BankedCounter` (v0.5.0 final review).
 - **Coin tests: pin the `MaxWrapBurst` boundary and same-poll orderings.**
   Nothing asserts wrap candidate == 15 (counted) vs 16 (resync), death+collect
   in one poll, or collect+bank in one poll. Cheap facts that would lock

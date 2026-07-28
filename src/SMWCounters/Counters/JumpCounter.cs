@@ -1,12 +1,13 @@
 using System.Drawing;
-using System.Xml;
 
 using LiveSplit.SmwCounters.Snes;
-using LiveSplit.UI;
 
 namespace LiveSplit.SmwCounters.Counters;
 
 // Counts player-initiated jumps by edge-detecting Mario's in-air state.
+// A BankedCounter since v0.5.x: unbanked jumps show gold and are discarded
+// on death; reaching a midway or completing an exit banks them (same
+// "Discard on death" toggle as Powerups/Coins, low-jump% semantics).
 //
 // Algorithm: count when the previous poll had Mario on the ground AND the
 // current poll has him in a rising state.
@@ -32,7 +33,7 @@ namespace LiveSplit.SmwCounters.Counters;
 //
 // Source: SMWDisX rammap.asm (PlayerInAir, PlayerBlockedDir) and bank_01
 // bounce routine.
-internal sealed class JumpCounter : ISmwCounter
+internal sealed class JumpCounter : BankedCounter
 {
     private const int GameModeOffset    = 0x0100;
     private const int PlayerInAirOffset = 0x0072;
@@ -49,33 +50,15 @@ internal sealed class JumpCounter : ISmwCounter
 
     private readonly PreviousByte previousAir = new();
     private readonly PreviousByte previousBlocked = new();
+    private readonly MidwayExitBankDetector bank = new();
 
-    public string Id => "jumps";
-    public Image DefaultIcon => icon;
-    public string DefaultLabel => "Jumps";
+    public override string Id => "jumps";
+    public override Image DefaultIcon => icon;
+    public override string DefaultLabel => "Jumps";
+    protected override string SaveName => "Jumps";
 
-    public int Value { get; private set; }
-
-    public bool ValueIsAlert => false;
-
-    public void Reset()
+    protected override int DetectCollectDelta(ISnesMemory memory)
     {
-        Value = 0;
-        previousAir.Clear();
-        previousBlocked.Clear();
-    }
-
-    public void SetValue(int value) => Value = value;
-
-    public void Poll(ISnesMemory memory)
-    {
-        if (!memory.IsAttached)
-        {
-            previousAir.Clear();
-            previousBlocked.Clear();
-            return;
-        }
-
         // Gate on game mode (level-main), not the legacy $1935 in-level flag:
         // custom Yoshi Houses never set $1935, so jumps there wouldn't count
         // (live-confirmed 2026-07-27). Mirrors PowerupCounter's gate.
@@ -83,7 +66,7 @@ internal sealed class JumpCounter : ISmwCounter
         {
             previousAir.Clear();
             previousBlocked.Clear();
-            return;
+            return 0;
         }
 
         if (!memory.ReadWramByte(PlayerInAirOffset, out byte air)
@@ -91,30 +74,29 @@ internal sealed class JumpCounter : ISmwCounter
         {
             previousAir.Clear();
             previousBlocked.Clear();
-            return;
+            return 0;
         }
 
+        int delta = 0;
         if (previousAir.HasPrevious && previousBlocked.HasPrevious)
         {
             bool wasOnGround = previousAir.Value == OnGround
                 && (previousBlocked.Value & BlockedBelow) != 0;
             bool isRising = air == AirRising || air == AirRisingP;
-            if (wasOnGround && isRising) { Value++; }
+            if (wasOnGround && isRising) { delta = 1; }
         }
 
         previousAir.Set(air);
         previousBlocked.Set(blocked);
+        return delta;
     }
 
-    public void SaveState(XmlDocument doc, XmlElement parent)
-    {
-        SettingsHelper.CreateSetting(doc, parent, "Jumps", Value);
-    }
+    protected override bool DetectBank(ISnesMemory memory) => bank.DetectBank(memory);
 
-    public void LoadState(XmlElement parent)
+    protected override void ClearDetectors()
     {
-        Value = SettingsHelper.ParseInt(parent["Jumps"], 0);
         previousAir.Clear();
         previousBlocked.Clear();
+        bank.Clear();
     }
 }
