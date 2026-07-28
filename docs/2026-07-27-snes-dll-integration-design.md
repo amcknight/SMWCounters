@@ -47,7 +47,10 @@ unconditionally. The status-first consumer idiom from
 
 1. **Process (re)acquire.** If no live process (`null` or `HasExited`): scan
    the ordered name list, take the first running match, `emu.Attach(process)`,
-   `ready = false`. No match → remain detached.
+   `ready = false`. No match → remain detached. Acquisition attempts are
+   throttled to ~1/second while detached (a bare `GetProcessesByName` × 10
+   names at the 15 ms tick rate would be ~66 scans/sec of pure waste; the
+   other idiom steps stay per-tick).
 2. **Rebind watch.** If `ready` and `Status().Generation` != last seen
    generation → `ready = false` (covers silent rival-eviction rebinds).
 3. `try { emu.Ready(); } catch { ready = false; }` — the throw IS the
