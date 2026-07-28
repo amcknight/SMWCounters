@@ -11,6 +11,8 @@ fan-community speedrunning iconography for their respective counters:
 - `exit.png` &mdash; level exits counter (overworld completion marker)
 - `jump.png` &mdash; jump counter (Mario jumping sprite)
 - `mushroom.png` &mdash; powerups counter (Super Mushroom sprite)
+- `kill.png` &mdash; kills/destruction counter
+- `coin.png` &mdash; coins counter
 
 ## WRAM discovery
 

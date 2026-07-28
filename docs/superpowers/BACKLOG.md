@@ -127,7 +127,25 @@ first within each group.
 - **Settings dialog is fixed-size** (not user-resizable). Minor; widen if it
   ever feels cramped.
 
+- **`HasBankToggle` before counter #3.** The "has a Discard-on-death toggle"
+  concept is encoded as `c is PowerupCounter or CoinCounter` in two places in
+  `SmwCountersComponent` (Poll wiring + BuildExtras). Fine at two types; a
+  third banked-toggle counter should collapse both sites into a
+  `virtual bool HasBankToggle` on `BankedCounter` (v0.5.0 final review).
+- **Coin tests: pin the `MaxWrapBurst` boundary and same-poll orderings.**
+  Nothing asserts wrap candidate == 15 (counted) vs 16 (resync), death+collect
+  in one poll, or collect+bank in one poll. Cheap facts that would lock
+  `BankedCounter.Poll` ordering semantics (v0.5.0 final review).
+
 ## Known limitations (documented, not bugs)
+
+- **`GetSettingsHashCode` doesn't hash `BankedCounter.saved`.** A bank event
+  that changes `saved` but not `total` doesn't dirty the layout hash, so
+  LiveSplit may not prompt to save and a reload can restore a stale `saved`
+  (spurious gold alert + revert to an older bank). Pre-existing since exit
+  banking; widened by each banked counter. Fix shape: expose a `StateHash`
+  from `BankedCounter` like `KillCounter.StateHash` and fold it in (v0.5.0
+  final review).
 
 - **Exit redo inflation.** Re-completing an already-saved exit fires the Finish
   collect but does not increment `$1F2E` (the game only counts new exits), so it
