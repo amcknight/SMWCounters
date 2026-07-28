@@ -1,0 +1,158 @@
+using System.Diagnostics;
+using System.Drawing;
+
+using SNES;
+
+namespace LiveSplit.SmwCounters.Snes;
+
+// Bridges SNES.dll's structural WRAM discovery to the counters' ISnesMemory
+// seam, driving the status-first consumer idiom
+// (snes_offsets/docs/status-first-consumption.md) once per poll tick:
+//   Ready() throw => not ready; GetOffset() retry while not ready (silent —
+//   discovery runs on SNES.dll's own background task); Status() for telemetry.
+// Exceptions are control flow, not telemetry: messages are never parsed.
+internal sealed class SnesConnection : ISnesMemory
+{
+    // Mirrors ../kaizosplits/Kaizo.asl's state() declarations, in order.
+    // The kaizosplits autosplitter is the source of truth for this list so
+    // both components always attach to the same emulator process — do not
+    // reorder or extend without changing Kaizo.asl first.
+    private static readonly string[] ProcessNames =
+    {
+        "snes9x", "snes9x-x64", "bsnes", "retroarch", "higan",
+        "snes9x-rr", "mesen", "emuhawk", "ares", "mednafen",
+    };
+
+    // Process enumeration is comparatively expensive; at the 15 ms poll rate
+    // an unthrottled scan would run ~66x/sec while no emulator is open.
+    private const int AcquireIntervalMs = 1000;
+
+    private readonly Emu emu = new();
+    private readonly Stopwatch acquireClock = Stopwatch.StartNew();
+    private Process process;
+    private bool ready;
+    private int lastGeneration = -1;
+    private long lastAcquireMs = -AcquireIntervalMs;
+
+    public SnesConnection()
+    {
+        Status = emu.Status(); // Detached snapshot; Diag is never null
+    }
+
+    public EmuStatus Status { get; private set; }
+
+    public Color DotColor => StatusDot.ColorFor(
+        Status.StateName, Status.IsCoolingDown,
+        Status.WitnessVerdict, Status.WitnessBase, Status.WramBase);
+
+    public bool IsAttached => ready && process != null && !process.HasExited;
+
+    // Drive attach/discovery one step. Called every poll tick regardless of
+    // timer phase (always-on discovery: the dot should be green before a run
+    // starts). Non-blocking: discovery runs on SNES.dll's background task and
+    // GetOffset() throws while it is in flight.
+    public void Tick()
+    {
+        if (process != null && process.HasExited)
+        {
+            process = null;
+            ready = false;
+        }
+
+        if (process == null && acquireClock.ElapsedMilliseconds - lastAcquireMs >= AcquireIntervalMs)
+        {
+            lastAcquireMs = acquireClock.ElapsedMilliseconds;
+            process = FindEmulatorProcess();
+            if (process != null)
+            {
+                emu.Attach(process);
+                ready = false;
+            }
+        }
+
+        if (process != null)
+        {
+            // A rival eviction rebinds silently (no Ready() throw) but bumps
+            // Generation; every watcher bound to the old base must re-baseline,
+            // which dropping `ready` achieves (IsAttached goes false for a
+            // tick, so counters flush their PreviousByte state).
+            if (ready && emu.Generation != lastGeneration) { ready = false; }
+
+            try { emu.Ready(); } catch { ready = false; }
+
+            if (!ready)
+            {
+                try
+                {
+                    emu.GetOffset();
+                    ready = true;
+                    lastGeneration = emu.Generation;
+                }
+                catch { /* in flight, cooling down, or declined — Status() carries the news */ }
+            }
+        }
+
+        Status = emu.Status();
+    }
+
+    public bool ReadWramByte(int snesOffset, out byte value)
+    {
+        value = 0;
+        if (!IsAttached) { return false; }
+        try
+        {
+            value = emu.Read1(snesOffset);
+            return true;
+        }
+        catch
+        {
+            return false; // lost mid-tick; next Tick() re-enters the idiom
+        }
+    }
+
+    // Human status-line fragment for the settings panel.
+    public string Describe()
+    {
+        EmuStatus s = Status;
+        string proc = process != null ? process.ProcessName : "?";
+        switch (s.StateName)
+        {
+            case "Detached":
+                return "No emulator found";
+            case "NoContent":
+                return $"{proc} · no game detected{CooldownSuffix(s)}";
+            case "Searching":
+                return $"{proc} · searching for game{CooldownSuffix(s)}{ErrorSuffix(s)}";
+            case "Discovering":
+                return $"{proc} · discovering WRAM…";
+            case "Resolved":
+            case "Held":
+            case "Degraded":
+                return $"{proc} · WRAM @ 0x{s.WramBase:X} ({s.MethodName})";
+            default:
+                return $"{proc} · {s.StateName}";
+        }
+    }
+
+    private static string CooldownSuffix(EmuStatus s)
+        => s.IsCoolingDown ? " (retry pending)" : "";
+
+    private static string ErrorSuffix(EmuStatus s)
+        => string.IsNullOrEmpty(s.LastError) ? "" : $" — {s.LastError}";
+
+    private static Process FindEmulatorProcess()
+    {
+        foreach (string name in ProcessNames)
+        {
+            Process[] found = Process.GetProcessesByName(name);
+            Process alive = null;
+            foreach (Process p in found)
+            {
+                if (alive == null && !p.HasExited) { alive = p; }
+                else { p.Dispose(); }
+            }
+            if (alive != null) { return alive; }
+        }
+        return null;
+    }
+}
