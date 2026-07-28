@@ -73,6 +73,15 @@ first within each group.
   from kicked status (`0A->04`), which the koopa origin rule excludes from
   Kills by design (observed 22:42:11, 2026-07-16). Debatable whether a
   Yoshi-stomped disco shell "is" a creature kill; revisit if it grates.
+- **Dragon-coin persistence awareness (Coins counter).** Idea 2026-07-28: some
+  hacks patch dragon coins to stay collected across deaths (vanilla does not).
+  In those hacks a dragon-coin get is effectively already banked, and the
+  Coins counter's die-revert is wrong for that portion. Research path: find a
+  tell for "this hack saves dragon coins" — vanilla tracks the in-level count
+  at `$1422`; persistence patches typically maintain a per-level collected
+  bitfield in extra WRAM/SRAM. DebugLogger a candidate-WRAM session on a hack
+  known to save them (collect, die, watch what survives) before designing
+  anything. Edge case; only worth it if it grates in real runs.
 - **Weighted powerup counting (Cape/Fire = 2).** Parked. The rationale (Fire
   "contains" two powerups) is shaky since a hit while Cape/Fire appears to drop
   straight to Small, not Big, and may be hack-dependent. Revisit only with live
