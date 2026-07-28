@@ -72,6 +72,8 @@ internal sealed class SnesConnection : ISnesMemory
 
         if (process != null)
         {
+            bool wasReady = ready;
+
             // A rival eviction rebinds silently (no Ready() throw) but bumps
             // Generation; every watcher bound to the old base must re-baseline,
             // which dropping `ready` achieves (IsAttached goes false for a
@@ -80,7 +82,15 @@ internal sealed class SnesConnection : ISnesMemory
 
             try { emu.Ready(); } catch { ready = false; }
 
-            if (!ready)
+            // On a rebind (wasReady but not anymore), the Emu already has the
+            // new base committed — GetOffset() would return immediately and
+            // re-arm `ready` within this same tick, so IsAttached would never
+            // read false and the counters would bridge PreviousByte across the
+            // old and new WRAM bases. Skip the re-arm this tick so IsAttached
+            // is false for exactly one poll; the next Tick() re-arms normally.
+            // Fresh attach has wasReady == false already, so first-time
+            // discovery is unaffected and re-arms without delay.
+            if (!ready && !wasReady)
             {
                 try
                 {
