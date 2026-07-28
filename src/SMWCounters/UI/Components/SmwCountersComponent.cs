@@ -324,14 +324,14 @@ public class SmwCountersComponent : IComponent
         };
 
         // Status pixel: a tiny connection-health indicator pinned to the
-        // component's top-left corner, outside the row flow so it stays put
-        // regardless of counter layout or alignment.
+        // component's left edge, vertically centered, outside the row flow so
+        // it stays put regardless of counter layout or alignment.
         if (Settings.ShowStatusDot)
         {
             const float dotSize = 5f;
             using (var dotBrush = new SolidBrush(connection.DotColor))
             {
-                g.FillRectangle(dotBrush, 3f, 1f, dotSize, dotSize);
+                g.FillRectangle(dotBrush, 3f, (height - dotSize) / 2f, dotSize, dotSize);
             }
         }
 
