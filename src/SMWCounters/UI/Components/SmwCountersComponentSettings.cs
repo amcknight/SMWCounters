@@ -516,8 +516,23 @@ public class SmwCountersComponentSettings : UserControl
             parent.AppendChild(bankNode);
         }
 
-        foreach (string id in enabled) { hash ^= id.GetHashCode(); }
-        foreach (string id in bankDisabled) { hash ^= id.GetHashCode(); }
-        return hash;
+        return CombineSetHashes(hash, enabled, bankDisabled);
+    }
+
+    // Fold the two id sets into the settings hash. Each set folds
+    // commutatively (HashSet iteration order is unspecified) into its own
+    // sub-hash, then the sub-hashes combine order-sensitively — an id in
+    // `enabled` can no longer cancel the same id in `bankDisabled`, which
+    // previously made {enabled:[x], bankDisabled:[x]} hash like {}.
+    // Static and internal so tests can pin the collision fix without
+    // constructing this control (and its CompositeHook).
+    internal static int CombineSetHashes(int hash, IEnumerable<string> enabledIds, IEnumerable<string> bankDisabledIds)
+    {
+        int enabledHash = 0;
+        int bankHash = 0;
+        foreach (string id in enabledIds) { enabledHash ^= id.GetHashCode(); }
+        foreach (string id in bankDisabledIds) { bankHash ^= id.GetHashCode(); }
+        hash = hash * 397 ^ enabledHash;
+        return hash * 397 ^ bankHash;
     }
 }
