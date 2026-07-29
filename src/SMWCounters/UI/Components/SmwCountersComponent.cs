@@ -41,6 +41,13 @@ public class SmwCountersComponent : IComponent
     private readonly Dictionary<string, SimpleLabel> labelCells = new();
     private readonly Dictionary<string, SimpleLabel> valueCells = new();
     private readonly GraphicsCache cache = new();
+
+    // GDI objects are cached across draws; DrawGeneral runs at LiveSplit's
+    // redraw rate and per-draw Font/SolidBrush allocations churn GDI handles.
+    // SimpleLabel.Brush is a plain property (never disposed by the label), so
+    // sharing cached brushes across labels is safe.
+    private Font rowFont;
+    private readonly Dictionary<int, SolidBrush> brushCache = new();
     private readonly System.Windows.Forms.ToolTip extrasToolTip = new();
 
     public SmwCountersComponentSettings Settings { get; }
@@ -48,7 +55,9 @@ public class SmwCountersComponent : IComponent
     public string ComponentName => "SMW Counters";
 
     public float VerticalHeight { get; private set; } = 10f;
-    public float MinimumHeight { get; private set; }
+    // Consulted by LiveSplit's horizontal layout mode (the counterpart of
+    // MinimumWidth below); leaving it 0 lets the layout collapse the row.
+    public float MinimumHeight => Settings.RowHeight;
     public float HorizontalWidth { get; private set; }
     public float MinimumWidth => 80f;
 
@@ -221,12 +230,12 @@ public class SmwCountersComponent : IComponent
 
         if (!timerActive)
         {
-            // Flush each counter's previous-byte state so that resuming after
-            // a gap doesn't bridge a stale sample to a fresh one and produce
-            // a spurious edge.
+            // Flush every counter's previous-byte state (enabled or not) so
+            // that resuming after a gap doesn't bridge a stale sample to a
+            // fresh one and produce a spurious edge.
             foreach (ISmwCounter c in counters)
             {
-                if (Settings.IsEnabled(c.Id)) { c.Poll(inert); }
+                c.Poll(inert);
             }
             debugLog.Idle();
             Settings.SetStatus("Paused · timer not running · " + connection.Describe());
@@ -239,7 +248,10 @@ public class SmwCountersComponent : IComponent
         foreach (ISmwCounter c in counters)
         {
             if (c is BankedCounter { HasBankToggle: true } bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }
-            if (Settings.IsEnabled(c.Id)) { c.Poll(connection); }
+            // Disabled counters get an inert poll so their edge state stays
+            // flushed; otherwise re-enabling one bridges a stale sample from
+            // minutes ago to fresh memory and can fabricate a phantom count.
+            c.Poll(Settings.IsEnabled(c.Id) ? connection : inert);
         }
 
         if (!connection.IsAttached)
@@ -289,7 +301,7 @@ public class SmwCountersComponent : IComponent
         Font layoutFont = state.LayoutSettings.TextFont;
         Color textColor = state.LayoutSettings.TextColor;
 
-        var font = new Font(layoutFont.FontFamily, Settings.RowHeight * 0.5f, layoutFont.Style, GraphicsUnit.Pixel);
+        Font font = GetRowFont(layoutFont);
         float textHeight = g.MeasureString("A", font).Height;
         VerticalHeight = Settings.RowHeight;
         PaddingTop = Math.Max(0, (VerticalHeight - (0.75f * textHeight)) / 2f);
@@ -359,6 +371,29 @@ public class SmwCountersComponent : IComponent
         }
     }
 
+    private Font GetRowFont(Font layoutFont)
+    {
+        float size = Settings.RowHeight * 0.5f;
+        if (rowFont == null || rowFont.Size != size
+            || rowFont.FontFamily.Name != layoutFont.FontFamily.Name
+            || rowFont.Style != layoutFont.Style)
+        {
+            rowFont?.Dispose();
+            rowFont = new Font(layoutFont.FontFamily, size, layoutFont.Style, GraphicsUnit.Pixel);
+        }
+        return rowFont;
+    }
+
+    private SolidBrush GetBrush(Color color)
+    {
+        if (!brushCache.TryGetValue(color.ToArgb(), out SolidBrush brush))
+        {
+            brush = new SolidBrush(color);
+            brushCache[color.ToArgb()] = brush;
+        }
+        return brush;
+    }
+
     private static float IconWidthFor(Image icon, int iconHeight)
         => (float)Math.Round((double)iconHeight * icon.Width / icon.Height);
 
@@ -383,7 +418,7 @@ public class SmwCountersComponent : IComponent
         label.Width = width;
         label.Height = height;
         label.Font = font;
-        label.Brush = new SolidBrush(color);
+        label.Brush = GetBrush(color);
         label.HasShadow = state.LayoutSettings.DropShadows;
         label.ShadowColor = state.LayoutSettings.ShadowsColor;
         label.OutlineColor = state.LayoutSettings.TextOutlineColor;
@@ -454,6 +489,9 @@ public class SmwCountersComponent : IComponent
         debugLog.Close();
         pollTimer?.Dispose();
         extrasToolTip?.Dispose();
+        rowFont?.Dispose();
+        foreach (SolidBrush brush in brushCache.Values) { brush.Dispose(); }
+        brushCache.Clear();
         state.OnReset -= State_OnReset;
         Settings.Hook.KeyOrButtonPressed -= Hook_KeyOrButtonPressed;
         Settings.Hook.UnregisterAllHotkeys();
