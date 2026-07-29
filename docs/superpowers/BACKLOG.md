@@ -126,6 +126,12 @@ first within each group.
   powerups" suggestion. Deemed possibly intrusive; left as credit-only for now.
 - **Settings dialog is fixed-size** (not user-resizable). Minor; widen if it
   ever feels cramped.
+- **Shareable settings code (idea 2026-07-28).** A textbox in Settings holding
+  a compact code that encodes the entire settings choice (enabled counters,
+  bank toggles, row height, alignment, etc.), copyable to send to a friend,
+  with a [Set] button beside it that applies an entered code. Effectively
+  serialize the existing settings XML to a short string (base64/deflate or a
+  custom compact form) and back. Not scheduled — wanted documented.
 
 - **Coin tests: pin the `MaxWrapBurst` boundary and same-poll orderings.**
   Nothing asserts wrap candidate == 15 (counted) vs 16 (resync), death+collect
