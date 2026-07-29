@@ -19,9 +19,6 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 //   SPR slot<n> id #<old>->#<new> | status=.. mode=..
 //                                             (sprite-number change while status
 //                                              unchanged; suppressed when status=00)
-//   YOS 18AC <old>-><new>                    (Yoshi swallow timer; research candidate)
-//   YOS slot<n> 160E/1594 <old>-><new>      (Yoshi tongue/mouth bytes; unverified
-//                                              addresses — see v2 spec)
 //   PRP slot<n> #<spriteNum> ->ss 1656=.. 1662=.. 166E=.. 167A=.. 1686=.. 190F=..
 //                                             (the slot's six tweaker property bytes,
 //                                              dumped when a sprite enters a dead/mouth
@@ -49,14 +46,6 @@ internal sealed class DebugLogger
     private const int MoonByte = 0x13C5;   // moons collected this scene
     private const int CoinCount = 0x0DBF;        // fireball-coin collection correlation
 
-    // Yoshi insta-eat research candidates (unverified — the whole point of
-    // logging them is to confirm which signal is reliable before the counter
-    // uses any of them; see the v2 spec, "Yoshi insta-eat coverage").
-    private const int YoshiSwallowTimer = 0x18AC;
-    private const int TongueTargetBase = 0x160E; // sprite misc table, per slot
-    private const int MouthFlagBase = 0x1594;    // sprite misc table, per slot
-    private const byte YoshiSpriteId = 0x35;
-
     // Sprite tables.
     private const int SpriteStatusBase = 0x14C8; // per-slot status ($14C8..$14D3)
     private const int SpriteNumberBase = 0x009E; // per-slot sprite id ($9E..$A9)
@@ -70,9 +59,6 @@ internal sealed class DebugLogger
     private readonly string logPath;
     private readonly PreviousByte[] prevStatus;
     private readonly PreviousByte[] prevSpriteNum;
-    private readonly PreviousByte[] prevTongueTarget;
-    private readonly PreviousByte[] prevMouthFlag;
-    private readonly PreviousByte prevSwallowTimer = new();
     private readonly Dictionary<string, int> lastValue = new();
     private readonly StatusChangeFilter statusFilter = new();
     private StreamWriter writer;
@@ -88,14 +74,10 @@ internal sealed class DebugLogger
 
         prevStatus = new PreviousByte[SlotCount];
         prevSpriteNum = new PreviousByte[SlotCount];
-        prevTongueTarget = new PreviousByte[SlotCount];
-        prevMouthFlag = new PreviousByte[SlotCount];
         for (int i = 0; i < SlotCount; i++)
         {
             prevStatus[i] = new PreviousByte();
             prevSpriteNum[i] = new PreviousByte();
-            prevTongueTarget[i] = new PreviousByte();
-            prevMouthFlag[i] = new PreviousByte();
         }
     }
 
@@ -127,13 +109,10 @@ internal sealed class DebugLogger
     public void Idle()
     {
         lastValue.Clear();
-        prevSwallowTimer.Clear();
         for (int i = 0; i < SlotCount; i++)
         {
             prevStatus[i].Clear();
             prevSpriteNum[i].Clear();
-            prevTongueTarget[i].Clear();
-            prevMouthFlag[i].Clear();
         }
     }
 
@@ -215,46 +194,7 @@ internal sealed class DebugLogger
             {
                 prevSpriteNum[i].Clear();
             }
-
-            LogYoshiCandidates(mem, i, haveSprite ? spriteNum : (byte)0);
         }
-
-        LogByteChange(mem, YoshiSwallowTimer, prevSwallowTimer, "YOS 18AC");
-    }
-
-    // Log "<label> <old>-><new>" whenever the watched byte changes between
-    // successful reads; a failed read clears the edge state instead.
-    private void LogByteChange(ISnesMemory mem, int offset, PreviousByte prev, string label)
-    {
-        if (mem.ReadWramByte(offset, out byte value))
-        {
-            if (prev.HasPrevious && prev.Value != value)
-            {
-                Write($"{label} {prev.Value:X2}->{value:X2}");
-            }
-            prev.Set(value);
-        }
-        else
-        {
-            prev.Clear();
-        }
-    }
-
-    // Research instrumentation: dump candidate Yoshi tongue/mouth bytes for
-    // slots holding the Yoshi sprite, so a play session can establish which
-    // signal reliably marks insta-eaten sprites (v2 spec, "Yoshi insta-eat
-    // coverage"). Remove or repurpose once the signal is confirmed.
-    private void LogYoshiCandidates(ISnesMemory mem, int slot, byte spriteNum)
-    {
-        if (spriteNum != YoshiSpriteId)
-        {
-            prevTongueTarget[slot].Clear();
-            prevMouthFlag[slot].Clear();
-            return;
-        }
-
-        LogByteChange(mem, TongueTargetBase + slot, prevTongueTarget[slot], $"YOS slot{slot} 160E");
-        LogByteChange(mem, MouthFlagBase + slot, prevMouthFlag[slot], $"YOS slot{slot} 1594");
     }
 
     private static string Hex(ISnesMemory mem, int offset)
