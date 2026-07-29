@@ -474,12 +474,13 @@ public class SmwCountersComponent : IComponent
         int hash = Settings.GetSettingsHashCode();
         foreach (ISmwCounter c in counters)
         {
-            // KillCounter maintains two tallies plus a display Mode, all of
-            // which are persisted (SaveState/LoadState) but only one of which
-            // shows through c.Value at a time. Hash the full state so the
-            // hidden tally or a mode flip (with equal tallies) still dirties
-            // the layout hash instead of silently dropping on save.
-            hash ^= c is KillCounter kc ? kc.StateHash : c.Value.GetHashCode();
+            // Salted, order-sensitive fold: raw XOR of counter values is
+            // commutative and self-inverse, so two counters holding equal
+            // values cancel out and the layout hash misses real changes.
+            // StateHash (not Value) so persisted-but-hidden state — banked
+            // `saved`, moon dedupe mode, the off-display kill tally — also
+            // dirties the hash instead of silently dropping on save.
+            hash = hash * 397 ^ c.StateHash;
         }
         return hash;
     }
