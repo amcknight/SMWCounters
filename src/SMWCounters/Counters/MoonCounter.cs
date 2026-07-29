@@ -34,6 +34,8 @@ internal sealed class MoonCounter : ISmwCounter
 
     public MoonDedupeMode DedupeMode { get; set; } = MoonDedupeMode.All;
 
+    public int StateHash => Value * 397 ^ (int)DedupeMode;
+
     public void Reset()
     {
         Value = 0;

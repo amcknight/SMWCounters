@@ -129,7 +129,7 @@ internal sealed class KillCounter : ISmwCounter
 
     // Layout-dirty hash input: both tallies and the mode are persisted, so all
     // three must influence the settings hash even while only one displays.
-    internal int StateHash => kills ^ (destruction * 397) ^ (int)Mode;
+    public int StateHash => kills ^ (destruction * 397) ^ (int)Mode;
 
     public bool ValueIsAlert => false;
 

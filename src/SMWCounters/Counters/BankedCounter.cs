@@ -41,6 +41,11 @@ internal abstract class BankedCounter : ISmwCounter
     public int Value => total;
     public bool ValueIsAlert => total != saved;
 
+    // saved is persisted but invisible to Value, so it must feed the hash:
+    // a bank commit (saved = total) changes what SaveState writes without
+    // moving Value at all.
+    public int StateHash => total * 397 ^ saved;
+
     public void Reset()
     {
         total = 0;

@@ -28,6 +28,12 @@ internal interface ISmwCounter
     // instead of the normal text color. Default-style: false for most counters.
     bool ValueIsAlert { get; }
 
+    // Hash of everything SaveState persists (value plus counter-specific
+    // config/hidden tallies). The component folds this into LiveSplit's
+    // layout hash so any persisted change dirties the layout — state that
+    // skips this hash can silently drop on save.
+    int StateHash { get; }
+
     void Reset();
 
     // Called once per poll tick when the component is attached. The counter

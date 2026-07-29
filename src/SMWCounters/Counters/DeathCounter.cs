@@ -25,6 +25,8 @@ internal sealed class DeathCounter : ISmwCounter
 
     public bool ValueIsAlert => false;
 
+    public int StateHash => Value;
+
     public void Reset()
     {
         Value = 0;
