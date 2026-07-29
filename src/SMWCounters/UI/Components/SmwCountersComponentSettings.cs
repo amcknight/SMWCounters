@@ -323,11 +323,6 @@ public class SmwCountersComponentSettings : UserControl
         RegisterHotKeys();
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-    }
-
     protected override void OnVisibleChanged(EventArgs e)
     {
         base.OnVisibleChanged(e);
@@ -437,8 +432,6 @@ public class SmwCountersComponentSettings : UserControl
         if (value) { enabled.Add(counterId); }
         else { enabled.Remove(counterId); }
     }
-
-    public IEnumerable<string> EnabledIds => enabled;
 
     public bool IsBankOnSave(string counterId) => !bankDisabled.Contains(counterId);
 

@@ -1,7 +1,6 @@
 using System.Drawing;
 
 using LiveSplit.SmwCounters.Snes;
-using LiveSplit.UI;
 
 namespace LiveSplit.SmwCounters.Counters;
 
