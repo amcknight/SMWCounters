@@ -4,40 +4,42 @@ using Xunit;
 
 namespace SMWCounters.Tests;
 
-// Pins the status-pixel severity ladder (v0.5.0): red detached, orange
-// degraded, yellow searching/discovering, green resolved, blue vouched,
-// gray cooldown, dim gray no-content. Mirrored in the SNES.dll consumer
-// contract (snes_offsets/docs/status-first-consumption.md).
+// Pins the status-pixel mapping (v0.5.0 live-test revision): red detached,
+// orange no-content, yellow searching/discovering, green degraded (working,
+// rivals live), blue resolved (settled), purple held, gray cooldown. The
+// witness vouch no longer changes the dot — it lives in the SNS log lines.
+// Mirrored in the SNES.dll consumer contract
+// (snes_offsets/docs/status-first-consumption.md).
 public class StatusDotTests
 {
     [Fact]
-    public void Resolved_WithRealVerdictOnCommittedBase_IsBlue()
+    public void Resolved_IsBlue_RegardlessOfVouch()
         => Assert.Equal(StatusDot.Blue,
             StatusDot.ColorFor("Resolved", false, "Real", 0x1000, 0x1000));
 
     [Fact]
-    public void Resolved_WithVerdictStampedOnRivalBase_IsGreen()
-        => Assert.Equal(StatusDot.Green,
+    public void Resolved_WithVerdictStampedOnRivalBase_IsStillBlue()
+        => Assert.Equal(StatusDot.Blue,
             StatusDot.ColorFor("Resolved", false, "Real", 0x2000, 0x1000));
 
     [Fact]
-    public void Resolved_WithoutRealVerdict_IsGreen()
-        => Assert.Equal(StatusDot.Green,
+    public void Resolved_WithoutRealVerdict_IsStillBlue()
+        => Assert.Equal(StatusDot.Blue,
             StatusDot.ColorFor("Resolved", false, "Ambiguous", 0x1000, 0x1000));
 
     [Fact]
-    public void Held_FollowsResolvedRules_BlueWhenVouched()
-        => Assert.Equal(StatusDot.Blue,
+    public void Held_IsPurple()
+        => Assert.Equal(StatusDot.Purple,
             StatusDot.ColorFor("Held", false, "Real", 0x1000, 0x1000));
 
     [Fact]
-    public void Held_FollowsResolvedRules_GreenOtherwise()
-        => Assert.Equal(StatusDot.Green,
+    public void Held_IsPurple_EvenUnvouched()
+        => Assert.Equal(StatusDot.Purple,
             StatusDot.ColorFor("Held", false, "", 0, 0x1000));
 
     [Fact]
-    public void Degraded_IsOrange_EvenWhenCoolingDown()
-        => Assert.Equal(StatusDot.Orange,
+    public void Degraded_IsGreen_EvenWhenCoolingDown()
+        => Assert.Equal(StatusDot.Green,
             StatusDot.ColorFor("Degraded", true, "Real", 0x1000, 0x1000));
 
     [Fact]
@@ -61,8 +63,8 @@ public class StatusDotTests
             StatusDot.ColorFor("Searching", true, "", 0, 0));
 
     [Fact]
-    public void NoContent_IsDimGray()
-        => Assert.Equal(StatusDot.DimGray,
+    public void NoContent_IsOrange()
+        => Assert.Equal(StatusDot.Orange,
             StatusDot.ColorFor("NoContent", false, "", 0, 0));
 
     [Fact]
