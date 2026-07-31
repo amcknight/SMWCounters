@@ -38,7 +38,10 @@ moons**, and **powerups** — by reading SNES WRAM from your running emulator.
 Open the component's settings (Edit Layout → double-click **SMW Counters**):
 
 - **Enable/disable** each counter independently (deaths and exits are on by
-  default; jumps, moons, and powerups are off by default).
+  default; jumps, moons, and powerups are off by default). Disabling a counter
+  only hides it — every counter tallies for the whole run, so switching one on
+  mid-run shows what it has been counting rather than starting from zero. Use
+  its **Reset** button if you want it to start over.
 - **3-up moon dedupe mode** — count **All** moons, or de-duplicate **Per level**
   or **Per room**.
 - **Powerups** — a low% helper: counts powerups collected, and turns the

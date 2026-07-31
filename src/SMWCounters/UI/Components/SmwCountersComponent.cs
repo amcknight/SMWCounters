@@ -117,10 +117,14 @@ public class SmwCountersComponent : IComponent
     private void State_OnReset(object sender, TimerPhase phase)
     {
         if (!Settings.ResetOnSplitsReset) { return; }
-        foreach (ISmwCounter c in counters)
-        {
-            if (Settings.IsEnabled(c.Id)) { c.Reset(); }
-        }
+        ResetAll();
+    }
+
+    // Hidden counters keep counting (see Poll), so a reset has to clear them
+    // too — otherwise enabling one later surfaces a tally from before the run.
+    private void ResetAll()
+    {
+        foreach (ISmwCounter c in counters) { c.Reset(); }
     }
 
     private (Control control, Action refresh) BuildExtras(ISmwCounter counter)
@@ -202,13 +206,7 @@ public class SmwCountersComponent : IComponent
 
     private void Hook_KeyOrButtonPressed(object sender, KeyOrButton e)
     {
-        if (e == Settings.ResetKey)
-        {
-            foreach (ISmwCounter c in counters)
-            {
-                if (Settings.IsEnabled(c.Id)) { c.Reset(); }
-            }
-        }
+        if (e == Settings.ResetKey) { ResetAll(); }
     }
 
     private void Poll()
@@ -248,10 +246,13 @@ public class SmwCountersComponent : IComponent
         foreach (ISmwCounter c in counters)
         {
             if (c is BankedCounter { HasBankToggle: true } bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }
-            // Disabled counters get an inert poll so their edge state stays
-            // flushed; otherwise re-enabling one bridges a stale sample from
-            // minutes ago to fresh memory and can fabricate a phantom count.
-            c.Poll(Settings.IsEnabled(c.Id) ? connection : inert);
+            // Every counter polls the live connection, enabled or not: the
+            // enabled set controls what the overlay *shows*, not what counts.
+            // Turning a counter on mid-run then reveals the tally it has been
+            // keeping all along instead of starting it from zero. (Polling all
+            // of them also keeps edge state continuous, so there is no stale
+            // sample for a re-enable to bridge.)
+            c.Poll(connection);
         }
 
         if (!connection.IsAttached)
