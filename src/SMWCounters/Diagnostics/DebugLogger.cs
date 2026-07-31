@@ -10,10 +10,19 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 // Opt-in debug instrumentation for investigating counter behavior. When enabled
 // (per the "Debug log" setting), each poll appends event lines to a log file:
 //
-//   CTR <id> <old>-><new> | phase=.. <emu> | mode=.. inLvl=.. anim=.. fanfare=..
-//       io=.. boss=.. exits=.. moon=.. coins=..
+//   CTR <id> <old>-><new> [unbanked,hidden] | phase=.. <emu> | mode=.. inLvl=..
+//       anim=.. fanfare=.. io=.. boss=.. exits=.. moon=.. coins=..
 //                                             (a counter incremented; context is
-//                                              the WRAM the counters key off of)
+//                                              the WRAM the counters key off of.
+//                                              `unbanked` = the value is showing
+//                                              gold; `hidden` = the counter is
+//                                              counting but not on the overlay)
+//   BNK <signal> <old>-><new> | mode=.. inLvl=.. lvl=.. room=.. cp=.. exitMode=..
+//       exits=.. midway=..
+//                                             (a byte the banking logic keys off
+//                                              of changed — answers "did the
+//                                              checkpoint actually fire, and
+//                                              which signal saw it?")
 //   SPR slot<n> #<spriteNum> <old>-><new> | mode=..
 //                                             (a sprite slot's $14C8 status changed)
 //   SPR slot<n> id #<old>->#<new> | status=.. mode=..
@@ -46,6 +55,18 @@ internal sealed class DebugLogger
     private const int MoonByte = 0x13C5;   // moons collected this scene
     private const int CoinCount = 0x0DBF;        // fireball-coin collection correlation
 
+    // Everything the bank ("progress is safe now") edge keys off of, traced
+    // byte-by-byte so a session can show which signal fired at a checkpoint.
+    private static readonly (string Name, int Offset)[] BankSignals =
+    {
+        ("midway",   0x13CE),   // vanilla midway flag
+        ("cp",       0x1B403),  // level entrance — custom kaizo checkpoints
+        ("exitMode", 0x0DD5),   // kaizosplits' Level Exit event
+        ("exits",    0x1F2E),   // saved exit count (late backstop)
+        ("lvl",      0x13BF),   // level number
+        ("room",     0x010B),   // room number
+    };
+
     // Sprite tables.
     private const int SpriteStatusBase = 0x14C8; // per-slot status ($14C8..$14D3)
     private const int SpriteNumberBase = 0x009E; // per-slot sprite id ($9E..$A9)
@@ -59,6 +80,7 @@ internal sealed class DebugLogger
     private readonly string logPath;
     private readonly PreviousByte[] prevStatus;
     private readonly PreviousByte[] prevSpriteNum;
+    private readonly PreviousByte[] prevBankSignal;
     private readonly Dictionary<string, int> lastValue = new();
     private readonly StatusChangeFilter statusFilter = new();
     private StreamWriter writer;
@@ -79,6 +101,9 @@ internal sealed class DebugLogger
             prevStatus[i] = new PreviousByte();
             prevSpriteNum[i] = new PreviousByte();
         }
+
+        prevBankSignal = new PreviousByte[BankSignals.Length];
+        for (int i = 0; i < BankSignals.Length; i++) { prevBankSignal[i] = new PreviousByte(); }
     }
 
     // Log this poll's counter increments and sprite-status transitions.
@@ -86,6 +111,7 @@ internal sealed class DebugLogger
                      Func<string, bool> isEnabled, string phase, string emuDesc)
     {
         LogCounterChanges(mem, counters, isEnabled, phase, emuDesc);
+        LogBankSignals(mem);
         LogSpriteTransitions(mem);
     }
 
@@ -114,6 +140,7 @@ internal sealed class DebugLogger
             prevStatus[i].Clear();
             prevSpriteNum[i].Clear();
         }
+        foreach (PreviousByte p in prevBankSignal) { p.Clear(); }
     }
 
     // Clear state and release the file (logging disabled / component disposed).
@@ -130,7 +157,6 @@ internal sealed class DebugLogger
     {
         foreach (ISmwCounter c in counters)
         {
-            if (!isEnabled(c.Id)) { continue; }
             int cur = c.Value;
             bool had = lastValue.TryGetValue(c.Id, out int prev);
             lastValue[c.Id] = cur;
@@ -141,9 +167,49 @@ internal sealed class DebugLogger
                     + $"io={Hex(mem, Io)} boss={Hex(mem, BossDefeat)} "
                     + $"exits={Hex(mem, ExitsSaved)} moon={Hex(mem, MoonByte)} "
                     + $"coins={Hex(mem, CoinCount)}";
-                Write($"CTR {c.Id} {prev}->{cur} | phase={phase} {emuDesc} | {ctx}");
+                Write($"CTR {c.Id} {prev}->{cur}{Tags(c, isEnabled)} | phase={phase} {emuDesc} | {ctx}");
             }
         }
+    }
+
+    // "[unbanked]" / "[hidden]" / "[unbanked,hidden]", or "" when neither
+    // applies. Both are invisible in the raw value but change how a session
+    // reads: a counter that never loses `unbanked` never banked.
+    private static string Tags(ISmwCounter counter, Func<string, bool> isEnabled)
+    {
+        var tags = new List<string>();
+        if (counter.ValueIsAlert) { tags.Add("unbanked"); }
+        if (!isEnabled(counter.Id)) { tags.Add("hidden"); }
+        return tags.Count == 0 ? "" : " [" + string.Join(",", tags) + "]";
+    }
+
+    private void LogBankSignals(ISnesMemory mem)
+    {
+        for (int i = 0; i < BankSignals.Length; i++)
+        {
+            (string name, int offset) = BankSignals[i];
+            if (!mem.ReadWramByte(offset, out byte value))
+            {
+                prevBankSignal[i].Clear();
+                continue;
+            }
+            if (prevBankSignal[i].HasPrevious && prevBankSignal[i].Value != value)
+            {
+                Write($"BNK {name} {prevBankSignal[i].Value:X2}->{value:X2} | "
+                    + $"mode={Hex(mem, GameMode)} inLvl={Hex(mem, InLevel)} " + BankContext(mem));
+            }
+            prevBankSignal[i].Set(value);
+        }
+    }
+
+    private static string BankContext(ISnesMemory mem)
+    {
+        string ctx = "";
+        foreach ((string name, int offset) in BankSignals)
+        {
+            ctx += $"{name}={Hex(mem, offset)} ";
+        }
+        return ctx.TrimEnd();
     }
 
     private void LogSpriteTransitions(ISnesMemory mem)
