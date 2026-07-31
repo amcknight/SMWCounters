@@ -2,43 +2,85 @@ using LiveSplit.SmwCounters.Snes;
 
 namespace LiveSplit.SmwCounters.Counters;
 
-// Shared "reached a checkpoint" edge detector for BankedCounters that bank on
-// the midway flag ($13CE stepping to 1) or a saved exit ($1F2E incrementing).
+// Shared "progress is safe now" edge for BankedCounters: the player reached a
+// checkpoint or finished the level, so unbanked collects stop being at risk.
+//
+// Checkpoint mirrors kaizosplits' Watchers.CP = Midway || CPEntrance. The
+// vanilla midway flag ($13CE) alone is not enough: kaizo hacks routinely ship
+// custom checkpoints that only repoint the level's entrance ($1B403), which is
+// why kaizosplits carries both detectors.
 internal sealed class MidwayExitBankDetector
 {
     private const int MidwayOffset = 0x13CE;
-    private const int ExitsCompletedOffset = 0x1F2E;
+    private const int InLevelOffset = 0x1935;
+    private const int LevelNumOffset = 0x13BF;
+    private const int RoomNumOffset = 0x010B;
+    private const int CpEntranceOffset = 0x1B403;
 
     private readonly PreviousByte previousMidway = new();
-    private readonly PreviousByte previousExits = new();
+    private readonly PreviousByte previousLevelNum = new();
+    private readonly PreviousByte previousCpEntrance = new();
+    private readonly LevelExitDetector levelExit = new();
+
+    // The room the current level started in. Entering a level repoints the
+    // entrance byte at its own first room, which is setup rather than a
+    // checkpoint; kaizosplits suppresses that with the same bookkeeping.
+    private byte firstRoom;
 
     public bool DetectBank(ISnesMemory memory)
     {
-        bool banked = false;
-
-        if (memory.ReadWramByte(MidwayOffset, out byte midway))
-        {
-            if (previousMidway.HasPrevious && midway == 1 && previousMidway.Value != 1)
-            {
-                banked = true;
-            }
-            previousMidway.Set(midway);
-        }
-        else { previousMidway.Clear(); }
-
-        if (memory.ReadWramByte(ExitsCompletedOffset, out byte exits))
-        {
-            if (previousExits.HasPrevious && exits > previousExits.Value) { banked = true; }
-            previousExits.Set(exits);
-        }
-        else { previousExits.Clear(); }
-
+        bool banked = DetectMidway(memory);
+        if (DetectCheckpointEntrance(memory)) { banked = true; }
+        if (levelExit.DetectExit(memory)) { banked = true; }
         return banked;
     }
 
     public void Clear()
     {
         previousMidway.Clear();
-        previousExits.Clear();
+        previousLevelNum.Clear();
+        previousCpEntrance.Clear();
+        levelExit.Clear();
+        firstRoom = 0;
+    }
+
+    private bool DetectMidway(ISnesMemory memory)
+    {
+        if (!memory.ReadWramByte(MidwayOffset, out byte midway))
+        {
+            previousMidway.Clear();
+            return false;
+        }
+        bool touched = previousMidway.HasPrevious && midway == 1 && previousMidway.Value != 1;
+        previousMidway.Set(midway);
+        if (touched) { firstRoom = 0; }
+        return touched;
+    }
+
+    private bool DetectCheckpointEntrance(ISnesMemory memory)
+    {
+        if (!memory.ReadWramByte(CpEntranceOffset, out byte entrance)
+            || !memory.ReadWramByte(LevelNumOffset, out byte levelNum)
+            || !memory.ReadWramByte(RoomNumOffset, out byte roomNum)
+            || !memory.ReadWramByte(InLevelOffset, out byte inLevel))
+        {
+            previousLevelNum.Clear();
+            previousCpEntrance.Clear();
+            return false;
+        }
+
+        if (previousLevelNum.HasPrevious && levelNum != previousLevelNum.Value)
+        {
+            firstRoom = roomNum;
+        }
+        previousLevelNum.Set(levelNum);
+
+        bool reached = inLevel == 1
+            && previousCpEntrance.HasPrevious
+            && entrance != previousCpEntrance.Value
+            && entrance != firstRoom;
+        previousCpEntrance.Set(entrance);
+        if (reached) { firstRoom = 0; }
+        return reached;
     }
 }

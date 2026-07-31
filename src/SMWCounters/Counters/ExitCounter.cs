@@ -5,22 +5,21 @@ using LiveSplit.SmwCounters.Snes;
 namespace LiveSplit.SmwCounters.Counters;
 
 // Collect on the early level-finish event (goal / orb / key / boss), matching
-// kaizosplits' finish detection, so the alert spans finish -> exit-write. Bank
-// when the exit is written to the save file ($1F2E increments). Switch palaces
-// are intentionally excluded: they don't increment $1F2E, so collecting on one
+// kaizosplits' finish detection, so the alert spans finish -> level exit. Bank
+// on the level-exit event itself (see LevelExitDetector). Switch palaces are
+// intentionally excluded: they end without a finish event, so collecting on one
 // would leave the alert stuck with no bank to clear it.
 internal sealed class ExitCounter : BankedCounter
 {
     private const int FanfareOffset = 0x0906;        // level-clear fanfare trigger
     private const int IoOffset = 0x1DFB;             // 3=Orb, 4=Goal, 7=Key
     private const int BossDefeatOffset = 0x13C6;     // 0 = boss not (yet) defeated
-    private const int ExitsCompletedOffset = 0x1F2E; // saved exit count
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.exit.png");
 
     private readonly PreviousByte previousFanfare = new();
     private readonly PreviousByte previousIo = new();
-    private readonly PreviousByte previousExits = new();
+    private readonly LevelExitDetector levelExit = new();
 
     public override bool HasBankToggle => false;
 
@@ -57,22 +56,12 @@ internal sealed class ExitCounter : BankedCounter
         return goal || orb || key || boss ? 1 : 0;
     }
 
-    protected override bool DetectBank(ISnesMemory memory)
-    {
-        if (!memory.ReadWramByte(ExitsCompletedOffset, out byte exits))
-        {
-            previousExits.Clear();
-            return false;
-        }
-        bool banked = previousExits.HasPrevious && exits > previousExits.Value;
-        previousExits.Set(exits);
-        return banked;
-    }
+    protected override bool DetectBank(ISnesMemory memory) => levelExit.DetectExit(memory);
 
     protected override void ClearDetectors()
     {
         previousFanfare.Clear();
         previousIo.Clear();
-        previousExits.Clear();
+        levelExit.Clear();
     }
 }

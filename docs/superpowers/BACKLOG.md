@@ -148,13 +148,22 @@ first within each group.
   from `BankedCounter` like `KillCounter.StateHash` and fold it in (v0.5.0
   final review).
 
-- **Exit redo inflation.** Re-completing an already-saved exit fires the Finish
-  collect but does not increment `$1F2E` (the game only counts new exits), so it
-  would leave the Exit alert gold until a death or reset. Does not occur in
-  normal fresh-run play. The mirror image (observed live 2026-07-14): on a save
-  file that already owns the exits, collected exits never bank and a later death
-  reverts them to 0 — the counter appears "stuck at 0" when replaying owned
-  exits. Working as designed for fresh runs; confusing on replayed saves.
+- ~~**Exit redo inflation.**~~ Fixed 2026-07-31: banking moved off `$1F2E` onto
+  kaizosplits' Level Exit event (`$0DD5`), which fires on every level exit
+  whether or not the save file already owns it. See "Checkpoint banking needs a
+  live confirmation pass" below for what still wants live eyes.
+- **Checkpoint banking needs a live confirmation pass.** 2026-07-31 shipped two
+  new bank signals on unit tests plus the kaizosplits reference: the level-exit
+  event (`$0DD5`, replacing the late `$1F2E`) and the custom-checkpoint entrance
+  (`$1B403`, alongside the vanilla midway flag `$13CE`). Neither has been seen
+  live yet. The open question that motivated `$1B403` — *did the reported "Jumps
+  stayed gold through a midway" mean the midway flag never fired, or did Jumps
+  simply re-arm the alert on the very next jump?* — is now answerable from one
+  session: `DebugLogger` emits `BNK <signal> <old>-><new>` lines for all six
+  banking bytes, and `CTR` lines carry an `[unbanked]` tag. Run a session with
+  Debug log on, hit a checkpoint, and read which signal moved. The `$0DD5`
+  false-positive risk to check at the same time: does it shift on sublevel
+  pipe/door transitions? If it does, a pipe would bank early.
 - **Destruction tally is not live-validated.** The 2026-07-16 sessions
   validated the Kills tally scenario-by-scenario; Destruction shipped on unit
   tests alone (shared detection paths, so risk is low). Flip the radio to

@@ -87,6 +87,60 @@ public class ExitCounterTests
     }
 
     [Fact]
+    public void LevelExit_BanksBeforeTheSaveWrite()
+    {
+        // $1F2E only moves once the overworld event runs, seconds after the
+        // level ends (live log 2026-07-31: still 00 seven seconds past the
+        // goal). kaizosplits' Level Exit — $0DD5 shifting off 0 — fires when
+        // the level actually ends, so bank there.
+        var c = new ExitCounter();
+        var m = new FakeSnesMemory();
+        m.SetByte(0x0DD5, 0);
+        Poll(c, m, 0, 0, 0, 10, 0);   // baseline
+        Poll(c, m, 1, 4, 0, 10, 0);   // goal: total=1, unbanked
+        Assert.True(c.ValueIsAlert);
+        m.SetByte(0x0DD5, 4);
+        Poll(c, m, 1, 4, 0, 10, 0);   // level exit, $1F2E still untouched
+        Assert.Equal(1, c.Value);
+        Assert.False(c.ValueIsAlert);
+    }
+
+    [Fact]
+    public void ExitModeToIdleValues_DoesNotBank()
+    {
+        // kaizosplits ignores exitMode 0 and 128; only other values mean the
+        // level ended.
+        var c = new ExitCounter();
+        var m = new FakeSnesMemory();
+        m.SetByte(0x0DD5, 0);
+        Poll(c, m, 0, 0, 0, 10, 0);
+        Poll(c, m, 1, 4, 0, 10, 0);   // goal: unbanked
+        m.SetByte(0x0DD5, 128);
+        Poll(c, m, 1, 4, 0, 10, 0);   // 0 -> 128 is not a level exit
+        Assert.True(c.ValueIsAlert);
+        m.SetByte(0x0DD5, 0);
+        Poll(c, m, 1, 4, 0, 10, 0);   // 128 -> 0 is not one either
+        Assert.True(c.ValueIsAlert);
+    }
+
+    [Fact]
+    public void ReplayedExit_BanksEvenThoughSaveCountNeverMoves()
+    {
+        // Re-completing an exit the save file already owns leaves $1F2E flat,
+        // which used to strand the alert until a death reverted it (BACKLOG
+        // "Exit redo inflation", observed live 2026-07-14).
+        var c = new ExitCounter();
+        var m = new FakeSnesMemory();
+        m.SetByte(0x0DD5, 0);
+        Poll(c, m, 0, 0, 0, 96, 0);   // save already owns 96 exits
+        Poll(c, m, 1, 4, 0, 96, 0);   // goal
+        m.SetByte(0x0DD5, 1);
+        Poll(c, m, 1, 4, 0, 96, 0);   // level exit; $1F2E stays 96 forever
+        Assert.Equal(1, c.Value);
+        Assert.False(c.ValueIsAlert);
+    }
+
+    [Fact]
     public void AfterGoalDeath_DoesNotCount()
     {
         var c = new ExitCounter();
