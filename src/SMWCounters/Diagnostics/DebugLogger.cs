@@ -34,6 +34,12 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 //                                              status 02-07 — builds the evidence table
 //                                              for a property-based creature filter that
 //                                              could replace the NotAlive ID blacklist)
+//   SNS state=.. gen=.. base=0x.. method=.. rebind=.. [rivals=..] [contested]
+//       [reg=..] [cooldown] [err=".."] [rom=..] [win=".."] [scanMs=..]
+//                                             (SNES.dll discovery status, logged
+//                                              only when it changes; `rom` is the
+//                                              v1.7.0 ROM identity slug and `win`
+//                                              the emulator's window title)
 //
 // The SPR trace answers questions like "what status does a fireballed enemy pass
 // through?" and "does the coin reuse the enemy's slot?"; the CTR line answers
@@ -116,18 +122,21 @@ internal sealed class DebugLogger
     }
 
     // Log SNES.dll status transitions ("SNS ..." lines): one line per change
-    // of (StateName, Generation, WramBase, IsCoolingDown, LastError), plus
-    // method/rebind provenance and scan latency on resolves. Called every
-    // tick while debug logging is enabled — including when the timer is not
-    // running, since always-on discovery transitions happen pre-run too.
-    public void LogStatus(SNES.EmuStatus status)
+    // of (StateName, Generation, WramBase, IsCoolingDown, LastError, ROM
+    // identity), plus method/rebind provenance and scan latency on resolves.
+    // Called every tick while debug logging is enabled — including when the
+    // timer is not running, since always-on discovery transitions happen
+    // pre-run too. The slug comes off `status` so every logged field is from
+    // one coherent snapshot; the window title is a live read and is handed in.
+    public void LogStatus(SNES.EmuStatus status, string windowTitle)
     {
         string line = statusFilter.OnStatus(
             status.StateName, status.Generation, status.WramBase,
             status.IsCoolingDown, status.LastError,
             status.MethodName, status.RebindReasonName,
             status.Diag != null ? status.Diag.ScanTotalMs : 0,
-            status.RivalCount, status.IsContested, status.RegressionCount);
+            status.RivalCount, status.IsContested, status.RegressionCount,
+            status.Rom?.Slug ?? "", windowTitle);
         if (line != null) { Write(line); }
     }
 

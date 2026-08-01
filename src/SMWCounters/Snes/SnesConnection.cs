@@ -23,6 +23,8 @@ internal sealed class SnesConnection : ISnesMemory
     private bool ready;
     private int lastGeneration = -1;
     private long lastAcquireMs = -AcquireIntervalMs;
+    private int titleProcessId = -1;
+    private string titleSlug;
 
     public SnesConnection()
     {
@@ -36,6 +38,18 @@ internal sealed class SnesConnection : ISnesMemory
         Status.WitnessVerdict, Status.WitnessBase, Status.WramBase);
 
     public bool IsAttached => ready && process != null && !process.HasExited;
+
+    // Raw emulator window title — the human-readable half of the ROM identity
+    // in the debug log ("clean - Snes9x 1.63"). Deliberately unparsed, per the
+    // consumer contract: every emulator decorates it differently and a
+    // prefix-stripping table would be exactly the kind of per-build table
+    // SNES.dll deleted. "" when detached or unavailable.
+    public string WindowTitle { get; private set; } = "";
+
+    // ROM identity slug (v1.7.0), "" before SNES.dll finds one. Render-only:
+    // the contract puts it in the churn tier, and an identity can commit
+    // transiently wrong around a ROM load before correcting itself.
+    private string RomSlug => Status.Rom?.Slug ?? "";
 
     // Drive attach/discovery one step. Called every poll tick regardless of
     // timer phase (always-on discovery: the dot should be green before a run
@@ -93,6 +107,7 @@ internal sealed class SnesConnection : ISnesMemory
         }
 
         Status = emu.Status();
+        RefreshWindowTitle(); // after the snapshot: keys off this tick's identity
     }
 
     public bool ReadWramByte(int snesOffset, out byte value)
@@ -139,4 +154,26 @@ internal sealed class SnesConnection : ISnesMemory
 
     private static string ErrorSuffix(EmuStatus s)
         => string.IsNullOrEmpty(s.LastError) ? "" : $" — {s.LastError}";
+
+    // emu.WindowTitle() does a Process.Refresh() + MainWindowTitle read, which
+    // has no business running 66x/sec on the poll tick. The title can only
+    // become newly informative when the process changes or a new ROM identity
+    // lands, so refresh on exactly those.
+    private void RefreshWindowTitle()
+    {
+        if (process == null)
+        {
+            WindowTitle = "";
+            titleProcessId = -1;
+            titleSlug = null;
+            return;
+        }
+
+        string slug = RomSlug;
+        if (process.Id == titleProcessId && slug == titleSlug) { return; }
+
+        titleProcessId = process.Id;
+        titleSlug = slug;
+        WindowTitle = emu.WindowTitle(); // never throws; "" when unavailable
+    }
 }

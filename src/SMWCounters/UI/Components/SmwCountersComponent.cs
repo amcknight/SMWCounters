@@ -216,7 +216,7 @@ public class SmwCountersComponent : IComponent
         // (structural discovery takes seconds; gating it on the timer would
         // lose the first seconds of counting).
         connection.Tick();
-        if (Settings.DebugLog) { debugLog.LogStatus(connection.Status); }
+        if (Settings.DebugLog) { debugLog.LogStatus(connection.Status, connection.WindowTitle); }
 
         // Counters still only count during a live run. NotRunning covers
         // title screen / file select / overworld-before-start (where SMW
