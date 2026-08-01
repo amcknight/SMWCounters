@@ -116,4 +116,60 @@ public class StatusChangeFilterTests
         f.OnStatus("Searching", 0, 0, false, null, "None", "None", 0);
         Assert.Null(f.OnStatus("Searching", 0, 0, false, "", "None", "None", 0));
     }
+
+    [Fact]
+    public void RomSlugChange_Retriggers()
+    {
+        var f = new StatusChangeFilter();
+        f.OnStatus("Resolved", 1, 0x7E0000, false, "", "Structural", "Fresh", 900,
+                   romSlug: "super-marioworld-a0da-67ba8a");
+        // Nothing but the identity moved: a ROM swap that never disturbs the
+        // WRAM bind must still leave a trace in the log.
+        string line = f.OnStatus("Resolved", 1, 0x7E0000, false, "", "Structural", "Fresh", 900,
+                                 romSlug: "akogare-mario-world-2-b17c-4419e2");
+        Assert.NotNull(line);
+        Assert.Contains("rom=akogare-mario-world-2-b17c-4419e2", line);
+    }
+
+    [Fact]
+    public void RomSlugAndWindowTitle_AppearInTheLine()
+    {
+        var f = new StatusChangeFilter();
+        string line = f.OnStatus("Resolved", 1, 0x7E0000, false, "", "Structural", "Fresh", 900,
+                                 romSlug: "super-marioworld-a0da-67ba8a",
+                                 windowTitle: "clean - Snes9x 1.63");
+        Assert.Contains("rom=super-marioworld-a0da-67ba8a", line);
+        Assert.Contains("win=\"clean - Snes9x 1.63\"", line);
+    }
+
+    [Fact]
+    public void EmptyRomSlugAndWindowTitle_AreOmittedFromTheLine()
+    {
+        var f = new StatusChangeFilter();
+        string line = f.OnStatus("Searching", 0, 0, false, "", "None", "None", 0);
+        Assert.DoesNotContain("rom=", line);
+        Assert.DoesNotContain("win=", line);
+    }
+
+    [Fact]
+    public void WindowTitleChangeAlone_DoesNotRetrigger()
+    {
+        var f = new StatusChangeFilter();
+        f.OnStatus("Resolved", 1, 0x7E0000, false, "", "Structural", "Fresh", 900,
+                   romSlug: "super-marioworld-a0da-67ba8a", windowTitle: "clean - Snes9x 1.63");
+        // The title is decoration (emulators churn it with FPS and the like)
+        // and never part of the change-key.
+        Assert.Null(f.OnStatus("Resolved", 1, 0x7E0000, false, "", "Structural", "Fresh", 900,
+                               romSlug: "super-marioworld-a0da-67ba8a",
+                               windowTitle: "clean - Snes9x 1.63 - 60 fps"));
+    }
+
+    [Fact]
+    public void NullRomSlugAndWindowTitle_AreTreatedAsEmpty()
+    {
+        var f = new StatusChangeFilter();
+        f.OnStatus("Searching", 0, 0, false, "", "None", "None", 0,
+                   romSlug: null, windowTitle: null);
+        Assert.Null(f.OnStatus("Searching", 0, 0, false, "", "None", "None", 0));
+    }
 }
