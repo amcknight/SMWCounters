@@ -136,7 +136,7 @@ internal sealed class DebugLogger
             status.MethodName, status.RebindReasonName,
             status.Diag != null ? status.Diag.ScanTotalMs : 0,
             status.RivalCount, status.IsContested, status.RegressionCount,
-            status.Rom?.Slug ?? "", windowTitle);
+            romSlug: status.Rom?.Slug ?? "", windowTitle: windowTitle);
         if (line != null) { Write(line); }
     }
 

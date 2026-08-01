@@ -25,6 +25,7 @@ internal sealed class SnesConnection : ISnesMemory
     private long lastAcquireMs = -AcquireIntervalMs;
     private int titleProcessId = -1;
     private string titleSlug;
+    private long lastTitleAttemptMs = -AcquireIntervalMs;
 
     public SnesConnection()
     {
@@ -157,8 +158,13 @@ internal sealed class SnesConnection : ISnesMemory
 
     // emu.WindowTitle() does a Process.Refresh() + MainWindowTitle read, which
     // has no business running 66x/sec on the poll tick. The title can only
-    // become newly informative when the process changes or a new ROM identity
-    // lands, so refresh on exactly those.
+    // become newly informative when the process changes, a new ROM identity
+    // lands, or the cached title is still blank (EmulatorProcessFinder can
+    // attach before the emulator's window exists, caching ""), so refresh on
+    // exactly those — and the blank-title retry is throttled to the existing
+    // 1 s acquire cadence rather than running every tick, so a session that
+    // never commits an identity still retries instead of logging an empty
+    // `win=` forever, but at no more than 1 Hz.
     private void RefreshWindowTitle()
     {
         if (process == null)
@@ -166,12 +172,16 @@ internal sealed class SnesConnection : ISnesMemory
             WindowTitle = "";
             titleProcessId = -1;
             titleSlug = null;
+            lastTitleAttemptMs = -AcquireIntervalMs;
             return;
         }
 
         string slug = RomSlug;
-        if (process.Id == titleProcessId && slug == titleSlug) { return; }
+        bool sameSource = process.Id == titleProcessId && slug == titleSlug;
+        if (sameSource && WindowTitle.Length > 0) { return; }
+        if (sameSource && acquireClock.ElapsedMilliseconds - lastTitleAttemptMs < AcquireIntervalMs) { return; }
 
+        lastTitleAttemptMs = acquireClock.ElapsedMilliseconds;
         titleProcessId = process.Id;
         titleSlug = slug;
         WindowTitle = emu.WindowTitle(); // never throws; "" when unavailable
