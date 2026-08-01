@@ -157,14 +157,13 @@ internal sealed class SnesConnection : ISnesMemory
         => string.IsNullOrEmpty(s.LastError) ? "" : $" — {s.LastError}";
 
     // emu.WindowTitle() does a Process.Refresh() + MainWindowTitle read, which
-    // has no business running 66x/sec on the poll tick. The title can only
-    // become newly informative when the process changes, a new ROM identity
-    // lands, or the cached title is still blank (EmulatorProcessFinder can
-    // attach before the emulator's window exists, caching ""), so refresh on
-    // exactly those — and the blank-title retry is throttled to the existing
-    // 1 s acquire cadence rather than running every tick, so a session that
-    // never commits an identity still retries instead of logging an empty
-    // `win=` forever, but at no more than 1 Hz.
+    // has no business running 66x/sec on the poll tick. Three things make the
+    // title newly informative, and nothing else does: a new process, a new ROM
+    // identity, and a cached title that is still blank — EmulatorProcessFinder
+    // can attach before the emulator's window exists, and a session that never
+    // commits an identity would otherwise log an empty `win=` forever. That
+    // last one is the only repeating case, so it retries at the 1 s acquire
+    // cadence rather than per tick.
     private void RefreshWindowTitle()
     {
         if (process == null)

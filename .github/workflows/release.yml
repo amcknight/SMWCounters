@@ -74,6 +74,10 @@ jobs:
             2. Copy **both** into your `LiveSplit/Components/` folder.
             3. In LiveSplit: right-click → Edit Layout → **+** → **Other → SMW Counters**.
 
+            **Upgrading?** Replace **both** files. They ship as a matched pair —
+            leaving an older `SNES.dll` in place next to a new `SMWCounters.dll`
+            breaks the component at runtime.
+
             Works with any SNES emulator build (RetroArch, snes9x, bsnes, higan,
             Mesen, BizHawk, ares, Mednafen) running Super Mario World — WRAM is
             found automatically, no per-version configuration. The LiveSplit
