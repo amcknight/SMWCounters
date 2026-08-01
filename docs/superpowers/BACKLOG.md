@@ -164,6 +164,16 @@ first within each group.
   Debug log on, hit a checkpoint, and read which signal moved. The `$0DD5`
   false-positive risk to check at the same time: does it shift on sublevel
   pipe/door transitions? If it does, a pipe would bank early.
+- **Point-blank fireball kills can be missed (sampling collapse).** When a
+  fireball hits at point-blank range, the sprite's status transition happens
+  inside a single poll gap, so the edge is never sampled and the kill is not
+  counted. Known and expected at the 15 ms poll rate — recorded here because it
+  is the one Kills miss that is a sampling artifact rather than a rule choice
+  (kills/destruction v2 live-smoke, 2026-07-15).
+- **Kills-row radio buttons sit at a fixed x=52 in Settings.** Flagged during
+  the v2 live-smoke as a possible clipping risk at non-100% DPI scaling; never
+  confirmed either way. If a user reports the Kills/Destruction radios
+  overlapping their label, this is the first thing to check.
 - **Destruction tally is not live-validated.** The 2026-07-16 sessions
   validated the Kills tally scenario-by-scenario; Destruction shipped on unit
   tests alone (shared detection paths, so risk is low). Flip the radio to
