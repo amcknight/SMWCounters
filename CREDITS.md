@@ -16,7 +16,7 @@ fan-community speedrunning iconography for their respective counters:
 
 ## WRAM discovery
 
-`lib/SNES.dll` (pinned v1.7.0) comes from the author's
+`lib/SNES.dll` (pinned v1.8.1) comes from the author's
 [snes_offsets](https://github.com/amcknight/snes_offsets) project: structural
 SNES WRAM discovery for LiveSplit consumers — no offset tables, reads only.
 
