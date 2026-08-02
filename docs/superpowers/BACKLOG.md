@@ -90,11 +90,15 @@ first within each group.
 
 ## In-level gating (consistency)
 
-- **Extend the game-mode gate to Jumps and Moons.** The Powerups counter now
-  gates its collect on game mode `$0100 == 0x14` (fixed counting in a custom
-  Yoshi House). **Jumps and Moons still gate on `$1935 == 1`** and have the same
-  blind spot in that level type. Jumps especially are worth switching (you jump
-  in a Yoshi House); Moons less so. Straightforward: mirror the powerup fix.
+- **Done for collects; one deliberate holdout remains.** Powerups, Jumps, and
+  Moons all gate their collect on game mode `$0100 == 0x14` now (Jumps since
+  the v0.5.x rework, Moons fixed 2026-08-02). The one remaining `$1935 == 1`
+  gate is `MidwayExitBankDetector.DetectCheckpointEntrance` — kept on purpose
+  because it mirrors kaizosplits' `Watchers.CPEntrance` (`InLevel && ...`) and
+  suppresses the entrance-repoint noise during level load (live log 2026-08-02:
+  `BNK cp 63->18` arrives at `inLvl=00`, pre-level). Known blind spot: a custom
+  checkpoint inside a level type that never sets `$1935` (Yoshi-House-style)
+  would not bank. No live sighting yet; revisit only with a log citation.
 
 ## UI / UX
 
