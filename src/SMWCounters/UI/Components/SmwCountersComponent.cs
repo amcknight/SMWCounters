@@ -22,6 +22,7 @@ public class SmwCountersComponent : IComponent
     private readonly Timer pollTimer;
     private readonly SnesConnection connection = new();
     private readonly DebugLogger debugLog = new();
+    private readonly EndedDisplayFreeze endedFreeze = new();
 
     // Shared "always detached" memory used to flush per-counter edge state
     // when polling is gated off (timer not running). Re-uses each counter's
@@ -220,11 +221,19 @@ public class SmwCountersComponent : IComponent
 
         // Counters still only count during a live run. NotRunning covers
         // title screen / file select / overworld-before-start (where SMW
-        // demos and casual play would otherwise pollute the counter); Ended
-        // covers post-run idle. Paused counts as active so a pause/resume
-        // preserves edge continuity.
+        // demos and casual play would otherwise pollute the counter). Paused
+        // counts as active so a pause/resume preserves edge continuity.
+        // Ended counts as active for timer parity: the counters keep tallying
+        // across a premature final split (display pinned by endedFreeze), so
+        // undoing the split reveals the true totals the way the timer jumps
+        // to where it would have been.
         bool timerActive = state.CurrentPhase == TimerPhase.Running
-            || state.CurrentPhase == TimerPhase.Paused;
+            || state.CurrentPhase == TimerPhase.Paused
+            || state.CurrentPhase == TimerPhase.Ended;
+
+        // Before this tick's polling, so the capture on the transition into
+        // Ended sees the values as of the split.
+        endedFreeze.OnPhase(state.CurrentPhase == TimerPhase.Ended, counters);
 
         if (!timerActive)
         {
@@ -284,11 +293,11 @@ public class SmwCountersComponent : IComponent
         foreach (ISmwCounter c in counters)
         {
             if (!Settings.IsEnabled(c.Id)) { continue; }
-            string value = c.Value.ToString();
+            string value = endedFreeze.ValueFor(c).ToString();
             valueCells[c.Id].Text = value;
             cache[c.Id + ".label"] = c.DefaultIcon != null ? "<icon>" : c.DefaultLabel;
             cache[c.Id + ".value"] = value;
-            cache[c.Id + ".alert"] = c.ValueIsAlert;
+            cache[c.Id + ".alert"] = endedFreeze.AlertFor(c);
         }
 
         if (invalidator != null && cache.HasChanged)
@@ -322,7 +331,7 @@ public class SmwCountersComponent : IComponent
             float labelW = c.DefaultIcon != null
                 ? IconWidthFor(c.DefaultIcon, iconHeight)
                 : g.MeasureString(c.DefaultLabel, font).Width;
-            float valueW = g.MeasureString(c.Value.ToString("0"), font).Width;
+            float valueW = g.MeasureString(endedFreeze.ValueFor(c).ToString("0"), font).Width;
             cellWidths[c.Id] = (labelW, valueW);
             if (totalWidth > 0) { totalWidth += CellGap; }
             totalWidth += labelW + 4 + valueW;
@@ -365,7 +374,7 @@ public class SmwCountersComponent : IComponent
             }
             x += labelW + 4;
 
-            Color valueColor = c.ValueIsAlert ? state.LayoutSettings.BestSegmentColor : textColor;
+            Color valueColor = endedFreeze.AlertFor(c) ? state.LayoutSettings.BestSegmentColor : textColor;
             ConfigureLabel(valueCells[c.Id], font, valueColor, StringAlignment.Near, x, valueW, height);
             valueCells[c.Id].Draw(g);
             x += valueW + CellGap;
