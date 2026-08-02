@@ -14,7 +14,9 @@ internal sealed class MoonCounter : ISmwCounter
     // SNES WRAM addresses (from kaizosplits Memory.cs).
     private const int MoonCounterOffset = 0x13C5; // # of 3-up moons collected, per scene
     private const int LevelNumOffset    = 0x13BF; // translevel number
-    private const int LevelStartOffset  = 0x1935; // in-level == 1 (kaizosplits InLevel)
+    private const int GameModeOffset    = 0x0100;
+
+    private const byte LevelMainMode    = 0x14;
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.moon.png");
 
@@ -57,7 +59,10 @@ internal sealed class MoonCounter : ISmwCounter
         // file-select, overworld, load transitions) $13C5 holds transient data
         // whose changes fire spuriously — clear the baseline so re-entry
         // establishes a fresh one instead of registering an edge.
-        if (!memory.ReadWramByte(LevelStartOffset, out byte levelStart) || levelStart != 1)
+        // Gate on game mode (level-main), not the legacy $1935 in-level flag:
+        // custom Yoshi Houses never set $1935, so moons there wouldn't count
+        // (live-confirmed 2026-07-27). Mirrors JumpCounter's gate.
+        if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
         {
             previousMoon.Clear();
             return;
