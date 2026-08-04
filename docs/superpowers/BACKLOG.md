@@ -49,6 +49,18 @@ first within each group.
   2026-07-16). Add a kills-row setting to exclude goal-tape conversions from
   the Kills tally for players who don't consider the tape a weapon —
   status `06` entries would then count Destruction only.
+- **Goal-tape conversion-to-powerup doesn't kill (live report 2026-08-04).**
+  The mirror case of the entry above: hacks where the tape converts enemies to
+  powerups route through a live-slot despawn (`08->00`) on the goal-trigger
+  tick — same tick the tape self-converts `7B->06` and `$0906` fanfare flips,
+  all still in game mode `0x14` (log 2026-08-04 14:25:33) — so nothing enters
+  the dead set and no Kill counts. Rule direction: key on the goal-trigger
+  tick and harvest remembered live-creature slots despawning at it. Needs one
+  logged experiment (goal crossed with enemies onscreen, plus a non-goal exit
+  as control — `08->00` is also what ordinary offscreen despawns look like).
+  Design together with the "goal tape doesn't kill" checkbox above: one
+  setting should govern both conversion paths (coin `08->06` and powerup
+  despawn) instead of two half-rules.
 - **Property-based creature filter (replace/augment the NotAlive blacklist).**
   The 2026-07-16 session showed the blacklist will keep growing (message box
   `0xB9` counted at the goal tape) and is error-prone (`0x4B` was mislabeled
@@ -110,6 +122,16 @@ first within each group.
   pre-emptively locked digit widths per counter. Chosen mitigation instead: a
   settings hint when many counters are enabled, suggesting a second
   SMWCounters instance stacked in the layout (ships in v0.5.0).
+- **Count-outside-active-run checkbox (idea 2026-08-04).** Opt-in setting to
+  keep the counters polling while the timer is not running (today NotRunning
+  flushes edge state and counts nothing — deliberate, so demos/casual play
+  don't pollute a run's tallies). Use case: practice/casual sessions where the
+  tallies are wanted without a live run. Open questions: does Reset still
+  zero? do banked counters bank/revert as normal? interaction with the
+  Ended-phase freeze (which already polls post-run) and with
+  `ResetOnSplitsReset`. Should be possible — the always-on connection and
+  the poll loop already run; the gate is one phase check in
+  `SmwCountersComponent.Poll`.
 - **Save/restore counter values for restarting a run.** Ideas floated: recover
   the last values after a Reset/close — e.g. show the previous values greyed in
   Settings with a "Recover" button, and/or expose it via right-click. Design
