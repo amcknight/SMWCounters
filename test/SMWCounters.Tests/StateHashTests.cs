@@ -72,4 +72,17 @@ public class StateHashTests
         c.Mode = KillCountMode.Destruction;
         Assert.NotEqual(before, ((ISmwCounter)c).StateHash);
     }
+
+    [Fact]
+    public void PlainHistory_DrivesStateHash_EvenWhenBankedValueMatches()
+    {
+        var a = new PowerupCounter(); var m = new FakeSnesMemory();
+        Poll(a, m, LevelMainMode, 0, 0, 0);
+        Poll(a, m, LevelMainMode, 2, 0, 0);   // grab
+        Poll(a, m, LevelMainMode, 9, 0, 0);   // die: total 0/saved 0/plain 1
+
+        var b = new PowerupCounter();          // untouched: 0/0/0
+        Assert.Equal(a.Value, b.Value);        // both display 0 (banked view)
+        Assert.NotEqual(((ISmwCounter)a).StateHash, ((ISmwCounter)b).StateHash);
+    }
 }

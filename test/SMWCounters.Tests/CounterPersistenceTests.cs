@@ -74,4 +74,39 @@ public class CounterPersistenceTests
         Assert.Equal(MoonDedupeMode.PerLevel, restored.DedupeMode);
         Assert.Equal(((ISmwCounter)c).StateHash, ((ISmwCounter)restored).StateHash);
     }
+
+    [Fact]
+    public void PlainHistory_SurvivesRoundTrip()
+    {
+        var c = new PowerupCounter(); var m = new FakeSnesMemory();
+        Poll(c, m, LevelMainMode, 0, 0, 0);
+        Poll(c, m, LevelMainMode, 2, 0, 0);   // total 1, plain 1, saved 0
+        Poll(c, m, LevelMainMode, 9, 0, 0);   // die: total 0, plain 1
+
+        var restored = new PowerupCounter();
+        XmlElement el = RoundTrip(c, restored);
+        Assert.Equal("1", el["PowerupsPlain"].InnerText);  // stable element name
+
+        Assert.Equal(0, restored.Value);                   // banked view
+        restored.Banked = false;
+        Assert.Equal(1, restored.Value);                   // plain view
+        Assert.Equal(((ISmwCounter)c).StateHash, ((ISmwCounter)restored).StateHash);
+    }
+
+    [Fact]
+    public void LegacyLayoutWithoutPlain_LoadsPlainAsTotal()
+    {
+        var doc = new XmlDocument();
+        XmlElement el = doc.CreateElement("state");
+        XmlElement v = doc.CreateElement("Powerups");
+        v.InnerText = "3";
+        el.AppendChild(v);
+
+        var c = new PowerupCounter();
+        c.LoadState(el);
+        Assert.Equal(3, c.Value);             // banked (saved also defaulted to 3)
+        Assert.False(c.ValueIsAlert);
+        c.Banked = false;
+        Assert.Equal(3, c.Value);             // plain defaulted to total
+    }
 }

@@ -6,21 +6,26 @@ using LiveSplit.UI;
 
 namespace LiveSplit.SmwCounters.Counters;
 
-// Shared "collect, then bank or discard-on-death" counter.
-//   collect => total += delta     (subclass DetectCollectDelta)
-//   die     => total = saved      (default: $0071 rising-edge to 9)
-//   bank    => saved = total      (subclass DetectBank)
-// Value shows total; ValueIsAlert is true while total != saved (unbanked).
+// Shared "collect, then bank or discard-on-death" counter tracking BOTH
+// histories every poll:
+//   banked:  collect => total += delta; die => total = saved (DeathEdge);
+//            bank => saved = total (subclass DetectBank)
+//   plain:   collect => plain += delta; never reverted
+// Banked is a pure display selector — it never changes what is tracked:
+//   Value       = Banked ? total : plain
+//   ValueIsAlert= Banked && total != saved   (plain view never alerts)
+// Flipping the "Discard on death" toggle mid-run therefore snaps the shown
+// value to what it would have been had the setting been that way all along.
 internal abstract class BankedCounter : ISmwCounter
 {
     private readonly DeathEdgeDetector deathEdge = new();
 
     protected int total;
     protected int saved;
+    protected int plain;   // the never-reverted "discard off" history
 
-    // When false the counter is a plain permanent tally: collects advance saved
-    // with total (no alert), and die-to-discard is a no-op. Driven by the
-    // per-counter "Bank on save" setting.
+    // Display selector (see class comment). Driven per-poll from the
+    // "Discard on death" setting for counters with HasBankToggle.
     public bool Banked { get; set; } = true;
 
     // Whether the settings UI exposes a "Discard on death" checkbox for this
@@ -35,18 +40,18 @@ internal abstract class BankedCounter : ISmwCounter
     // Serialization element base name (e.g. "Exits" -> <Exits>, <ExitsSaved>).
     protected abstract string SaveName { get; }
 
-    public int Value => total;
-    public bool ValueIsAlert => total != saved;
+    public int Value => Banked ? total : plain;
+    public bool ValueIsAlert => Banked && total != saved;
 
-    // saved is persisted but invisible to Value, so it must feed the hash:
-    // a bank commit (saved = total) changes what SaveState writes without
-    // moving Value at all.
-    public int StateHash => total * 397 ^ saved;
+    // Everything SaveState persists must feed the hash — including values the
+    // current display hides (saved, and the non-displayed history).
+    public int StateHash => (total * 397 ^ saved) * 397 ^ plain;
 
     public void Reset()
     {
         total = 0;
         saved = 0;
+        plain = 0;
         deathEdge.Clear();
         ClearDetectors();
     }
@@ -55,6 +60,7 @@ internal abstract class BankedCounter : ISmwCounter
     {
         total = value;
         saved = value;
+        plain = value;
     }
 
     public void Poll(ISnesMemory memory)
@@ -66,11 +72,9 @@ internal abstract class BankedCounter : ISmwCounter
             return;
         }
 
-        if (!Banked && total != saved) { saved = total; }
-
         if (DetectDeath(memory)) { total = saved; }
         int delta = DetectCollectDelta(memory);
-        if (delta > 0) { total += delta; if (!Banked) { saved = total; } }
+        if (delta > 0) { total += delta; plain += delta; }
         if (DetectBank(memory)) { saved = total; }
     }
 
@@ -87,6 +91,7 @@ internal abstract class BankedCounter : ISmwCounter
     {
         SettingsHelper.CreateSetting(doc, parent, SaveName, total);
         SettingsHelper.CreateSetting(doc, parent, SaveName + "Saved", saved);
+        SettingsHelper.CreateSetting(doc, parent, SaveName + "Plain", plain);
     }
 
     public void LoadState(XmlElement parent)
@@ -94,6 +99,7 @@ internal abstract class BankedCounter : ISmwCounter
         total = SettingsHelper.ParseInt(parent[SaveName], 0);
         // Back-compat: pre-v0.2.0 layouts have no <Name>Saved -> treat as banked.
         saved = SettingsHelper.ParseInt(parent[SaveName + "Saved"], total);
+        plain = SettingsHelper.ParseInt(parent[SaveName + "Plain"], total);
         deathEdge.Clear();
         ClearDetectors();
     }

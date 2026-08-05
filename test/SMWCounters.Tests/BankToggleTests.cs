@@ -70,4 +70,34 @@ public class BankToggleTests
         Assert.Equal(1, c.Value);
         Assert.False(c.ValueIsAlert);
     }
+
+    [Fact]
+    public void ToggleBackOn_RevealsTheBankedHistory_IncludingPastReverts()
+    {
+        var c = new PowerupCounter();               // Banked defaults to true
+        var m = new FakeSnesMemory();
+        Poll(c, m, 0x14, 0);                        // baseline in-level
+        Poll(c, m, 0x14, 2);                        // grab: banked total=1, plain=1
+        Poll(c, m, 0x14, 9);                        // die: banked reverts to 0, plain stays 1
+
+        c.Banked = false;
+        Assert.Equal(1, c.Value);                   // plain history: the grab still shows
+        Assert.False(c.ValueIsAlert);
+
+        c.Banked = true;
+        Assert.Equal(0, c.Value);                   // banked history remembered the revert
+        Assert.False(c.ValueIsAlert);               // total == saved == 0
+    }
+
+    [Fact]
+    public void BankedHistory_KeepsRunningWhileDisplayingPlain()
+    {
+        var c = new PowerupCounter { Banked = false };
+        var m = new FakeSnesMemory();
+        Poll(c, m, 0x14, 0);
+        Poll(c, m, 0x14, 2);                        // grab while plain view showing
+        Poll(c, m, 0x14, 9);                        // die: banked history reverts underneath
+        c.Banked = true;
+        Assert.Equal(0, c.Value);                   // the revert happened even while hidden
+    }
 }
