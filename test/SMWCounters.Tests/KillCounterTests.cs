@@ -8,6 +8,7 @@ namespace SMWCounters.Tests;
 public class KillCounterTests
 {
     private const int GameMode = 0x0100, StatusBase = 0x14C8, SpriteBase = 0x009E, CoinCount = 0x0DBF;
+    private const int Anim = 0x0071, Midway = 0x13CE, ExitMode = 0x0DD5;
     private const byte Level = 0x14, Alive = 0x08, Carryable = 0x09, Kicked = 0x0A,
                        Mouth = 0x07, Spinjump = 0x04, Falling = 0x02, TapeCoin = 0x06;
     // Sprite IDs used in tests (from the spec's evidence table).
@@ -574,6 +575,88 @@ public class KillCounterTests
         PollSlot0(c, m, Mouth, Springboard, gameMode: Level);  // back in-level, still 07: re-primes only
         PollSlot0(c, m, 0x00, Springboard);                    // swallow: entry unknown, counts nothing
         Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+    }
+
+    [Fact]
+    public void DeathEdge_RevertsBothTalliesToSaved()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        m.SetByte(Anim, 0);
+        PollSlot0(c, m, Alive);
+        PollSlot0(c, m, Spinjump);            // kill+destruction 1, unbanked
+        m.SetByte(Anim, 9);
+        PollSlot0(c, m, Spinjump);            // the death edge
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+    }
+
+    [Fact]
+    public void MidwayBank_LocksBothTallies_DeathAfterKeepsThem()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        m.SetByte(Anim, 0); m.SetByte(Midway, 0);
+        PollSlot0(c, m, Alive);
+        PollSlot0(c, m, Spinjump);            // 1/1 unbanked
+        m.SetByte(Midway, 1);
+        PollSlot0(c, m, Spinjump);            // midway 0->1 banks
+        m.SetByte(Anim, 9);
+        PollSlot0(c, m, Spinjump);            // die after the bank
+        Assert.Equal(1, Kills(c));
+        Assert.Equal(1, Destruction(c));
+    }
+
+    // The restructure's reason for existing: the exit flag lands at mode 0C
+    // (2026-08-04 log, 14:25:44) — the sprite scan is gated off there, but the
+    // bank must still fire.
+    [Fact]
+    public void ExitBank_FiresOutsideLevelMainMode()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        m.SetByte(Anim, 0); m.SetByte(ExitMode, 0);
+        PollSlot0(c, m, Alive);
+        PollSlot0(c, m, Spinjump);                    // 1/1 unbanked
+        m.SetByte(ExitMode, 1);                       // goal exit flag
+        PollSlot0(c, m, Spinjump, gameMode: 0x0C);    // level-end fade: banks
+        m.SetByte(ExitMode, 0);
+        PollSlot0(c, m, Alive, gameMode: Level);      // next level
+        m.SetByte(Anim, 9);
+        PollSlot0(c, m, Alive);                       // die there
+        Assert.Equal(1, Kills(c));                    // the exit locked them in
+        Assert.Equal(1, Destruction(c));
+    }
+
+    // Death exits park $0DD5 at 0x80 — excluded by LevelExitDetector. Dying
+    // must not bank what the same death is discarding.
+    [Fact]
+    public void DeathExitParking_DoesNotBank()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        m.SetByte(Anim, 0); m.SetByte(ExitMode, 0);
+        PollSlot0(c, m, Alive);
+        PollSlot0(c, m, Spinjump);                    // 1/1 unbanked
+        m.SetByte(Anim, 9);
+        PollSlot0(c, m, Spinjump);                    // die: revert to 0/0
+        m.SetByte(ExitMode, 0x80);
+        PollSlot0(c, m, Spinjump, gameMode: 0x0B);    // death-exit parking: no bank event
+        Assert.Equal(0, Kills(c));
+        Assert.Equal(0, Destruction(c));
+    }
+
+    // Death invalidates in-flight evidence: a pending fireball-coin kill must
+    // not resolve after the death that reverted its destruction credit.
+    [Fact]
+    public void Death_CancelsPendingFireballCoinEvidence()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        m.SetByte(Anim, 0);
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // E6: pending, destruction 1
+        m.SetByte(Anim, 9);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);  // die: revert + evidence cleared
+        m.SetByte(Anim, 0);
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);   // despawn + coin after death
+        Assert.Equal(0, Kills(c));                            // no posthumous kill
         Assert.Equal(0, Destruction(c));
     }
 }

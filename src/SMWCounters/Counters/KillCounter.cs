@@ -28,7 +28,7 @@ internal enum KillCountMode { Kills, Destruction }
 // v2 spec): a sprite is "not alive" if its ID is on the observed-offender
 // list, or if it is a koopa ID (04-07, shared by bare shells) dying from a
 // carryable state instead of the normal routine (08).
-internal sealed class KillCounter : ISmwCounter
+internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
 {
     private const int GameModeOffset = 0x0100;
     private const byte LevelMainMode = 0x14;
@@ -105,6 +105,13 @@ internal sealed class KillCounter : ISmwCounter
 
     private int kills;
     private int destruction;
+    private int killsSaved;
+    private int destructionSaved;
+    private int killsPlain;
+    private int destructionPlain;
+
+    private readonly DeathEdgeDetector deathEdge = new();
+    private readonly MidwayExitBankDetector bank = new();
 
     public KillCounter()
     {
@@ -125,6 +132,10 @@ internal sealed class KillCounter : ISmwCounter
     // settings flips this to choose which one renders. Not a behavior switch.
     public KillCountMode Mode { get; set; } = KillCountMode.Kills;
 
+    // Display selector, synced per poll from the "Discard on death" setting.
+    public bool Banked { get; set; } = true;
+    public bool HasBankToggle => true;
+
     public int Value => Mode == KillCountMode.Kills ? kills : destruction;
 
     // Layout-dirty hash input: both tallies and the mode are persisted, so all
@@ -143,6 +154,12 @@ internal sealed class KillCounter : ISmwCounter
     {
         kills = 0;
         destruction = 0;
+        killsSaved = 0;
+        destructionSaved = 0;
+        killsPlain = 0;
+        destructionPlain = 0;
+        deathEdge.Clear();
+        bank.Clear();
         ClearAll();
     }
 
@@ -150,10 +167,49 @@ internal sealed class KillCounter : ISmwCounter
     {
         if (!memory.IsAttached)
         {
+            deathEdge.Clear();
+            bank.Clear();
             ClearAll();
             return;
         }
 
+        // Death discard and banking watch the whole game, not just level-main:
+        // the exit-flag edge lands after the mode leaves $14 (2026-08-04 log:
+        // BNK exitMode 00->01 at mode=0C), and $0071 death edges fire fine in
+        // mode 14. Death exits park $0DD5 at 0x80, which LevelExitDetector
+        // excludes — dying never banks.
+        if (deathEdge.Detect(memory))
+        {
+            kills = killsSaved;
+            destruction = destructionSaved;
+            ClearInFlightEvidence();
+        }
+
+        ScanSprites(memory);
+
+        if (bank.DetectBank(memory))
+        {
+            killsSaved = kills;
+            destructionSaved = destruction;
+        }
+    }
+
+    // Death invalidates in-flight evidence: pending fireball coins, open coin
+    // windows, recorded mouth entries and tongue lingers all belong to the
+    // attempt that just ended.
+    private void ClearInFlightEvidence()
+    {
+        for (int i = 0; i < SlotCount; i++)
+        {
+            mouthEntry[i] = MouthEntry.None;
+            pendingCoin[i] = false;
+            coinWindow[i] = 0;
+            tongueLinger[i] = 0;
+        }
+    }
+
+    private void ScanSprites(ISnesMemory memory)
+    {
         if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
         {
             ClearAll();
@@ -216,7 +272,7 @@ internal sealed class KillCounter : ISmwCounter
             }
             if (oldest >= 0)
             {
-                kills++;
+                AddKill();
                 coinWindow[oldest] = 0;
             }
         }
@@ -226,6 +282,9 @@ internal sealed class KillCounter : ISmwCounter
             if (tongueLinger[i] > 0) { tongueLinger[i]--; }
         }
     }
+
+    private void AddKill() { kills++; killsPlain++; }
+    private void AddDestruction() { destruction++; destructionPlain++; }
 
     private void PollSlot(int i, byte status, byte sprite)
     {
@@ -251,7 +310,7 @@ internal sealed class KillCounter : ISmwCounter
         {
             if (IsCreature(prevSpr, prevStat))
             {
-                destruction++;
+                AddDestruction();
                 pendingCoin[i] = true;
             }
         }
@@ -277,7 +336,7 @@ internal sealed class KillCounter : ISmwCounter
             // E4 (swallow) / E5 (spit): leaving the mouth either way clears
             // the recorded entry. Only a swallowed *item* adds (Destruction);
             // a creature was already counted when it was eaten.
-            if (status == 0x00 && mouthEntry[i] == MouthEntry.Item) { destruction++; }
+            if (status == 0x00 && mouthEntry[i] == MouthEntry.Item) { AddDestruction(); }
             mouthEntry[i] = MouthEntry.None;
         }
         else if (status == 0x07 && prevStat != 0x07 && liveOrigin)
@@ -287,8 +346,8 @@ internal sealed class KillCounter : ISmwCounter
             // (springboard), so the ID list is the only reliable separator.
             if (IsCreature(sprite, prevStat))
             {
-                kills++;
-                destruction++;
+                AddKill();
+                AddDestruction();
                 mouthEntry[i] = MouthEntry.Creature;
             }
             else
@@ -303,8 +362,8 @@ internal sealed class KillCounter : ISmwCounter
             // instead of despawning cleanly is unobserved in evidence (coins
             // are seen to end 08 -> 00); if it happened, Destruction would be
             // double-counted here on top of E6 — accepted as Kills-safe.
-            if (IsCreature(sprite, prevStat)) { kills++; }
-            if (!(sprite == GoalTapeSprite && status == 0x06)) { destruction++; }
+            if (IsCreature(sprite, prevStat)) { AddKill(); }
+            if (!(sprite == GoalTapeSprite && status == 0x06)) { AddDestruction(); }
         }
         else if (prevStat == 0x08 && status == 0x00 && tongueLinger[i] > 0)
         {
@@ -317,8 +376,8 @@ internal sealed class KillCounter : ISmwCounter
             // an excluded ID here is more likely slot noise than a swallow.
             if (IsCreature(sprite, prevStat))
             {
-                kills++;
-                destruction++;
+                AddKill();
+                AddDestruction();
             }
             tongueLinger[i] = 0;
         }
@@ -372,6 +431,8 @@ internal sealed class KillCounter : ISmwCounter
             ? mode
             : KillCountMode.Kills;
 
+        deathEdge.Clear();
+        bank.Clear();
         ClearAll();
     }
 }
