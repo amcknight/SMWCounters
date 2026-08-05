@@ -100,4 +100,13 @@ public class BankToggleTests
         c.Banked = true;
         Assert.Equal(0, c.Value);                   // the revert happened even while hidden
     }
+
+    [Fact]
+    public void BankedCounters_ExposeTheToggleInterface()
+    {
+        Assert.IsAssignableFrom<IBankToggleCounter>(new PowerupCounter());
+        Assert.IsAssignableFrom<IBankToggleCounter>(new CoinCounter());
+        Assert.IsAssignableFrom<IBankToggleCounter>(new JumpCounter());
+        Assert.False(((IBankToggleCounter)new ExitCounter()).HasBankToggle);
+    }
 }

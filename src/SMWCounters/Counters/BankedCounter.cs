@@ -16,7 +16,7 @@ namespace LiveSplit.SmwCounters.Counters;
 //   ValueIsAlert= Banked && total != saved   (plain view never alerts)
 // Flipping the "Discard on death" toggle mid-run therefore snaps the shown
 // value to what it would have been had the setting been that way all along.
-internal abstract class BankedCounter : ISmwCounter
+internal abstract class BankedCounter : ISmwCounter, IBankToggleCounter
 {
     private readonly DeathEdgeDetector deathEdge = new();
 

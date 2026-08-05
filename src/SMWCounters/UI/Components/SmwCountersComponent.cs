@@ -254,7 +254,7 @@ public class SmwCountersComponent : IComponent
         // state, so a mid-run detach can't bridge stale samples on reattach.
         foreach (ISmwCounter c in counters)
         {
-            if (c is BankedCounter { HasBankToggle: true } bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }
+            if (c is IBankToggleCounter { HasBankToggle: true } bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }
             // Every counter polls the live connection, enabled or not: the
             // enabled set controls what the overlay *shows*, not what counts.
             // Turning a counter on mid-run then reveals the tally it has been
