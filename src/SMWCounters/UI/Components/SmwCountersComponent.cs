@@ -74,12 +74,11 @@ public class SmwCountersComponent : IComponent
         this.state = state;
 
         // Build the registry of known counters.
-        var moon = new MoonCounter();
         counters = new ISmwCounter[]
         {
             new DeathCounter(),
             new ExitCounter(),
-            moon,
+            new MoonCounter(),
             new JumpCounter(),
             new PowerupCounter(),
             new CoinCounter(),
@@ -130,21 +129,6 @@ public class SmwCountersComponent : IComponent
 
     private (Control control, Action refresh) BuildExtras(ISmwCounter counter)
     {
-        if (counter is MoonCounter moon)
-        {
-            var chk = new CheckBox
-            {
-                Text = "One per level",
-                AutoSize = true,
-                Checked = moon.DedupeMode == MoonDedupeMode.PerLevel,
-                Location = new Point(0, 4),
-            };
-            chk.CheckedChanged += (_, __) => moon.DedupeMode = chk.Checked ? MoonDedupeMode.PerLevel : MoonDedupeMode.All;
-            var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
-            panel.Controls.Add(chk);
-            Action refresh = () => chk.Checked = moon.DedupeMode == MoonDedupeMode.PerLevel;
-            return (panel, refresh);
-        }
         if (counter is BankedCounter { HasBankToggle: true })
         {
             var chk = new CheckBox

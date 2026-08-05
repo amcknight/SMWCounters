@@ -47,15 +47,6 @@ public class StateHashTests
     }
 
     [Fact]
-    public void MoonDedupeModeFlip_ChangesStateHash()
-    {
-        var c = new MoonCounter();
-        int before = ((ISmwCounter)c).StateHash;
-        c.DedupeMode = MoonDedupeMode.PerLevel;
-        Assert.NotEqual(before, ((ISmwCounter)c).StateHash);
-    }
-
-    [Fact]
     public void DeathValue_DrivesStateHash()
     {
         var c = new DeathCounter();

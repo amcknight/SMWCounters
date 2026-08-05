@@ -1,19 +1,24 @@
-using System.Collections.Generic;
 using System.Drawing;
-using System.Xml;
 
 using LiveSplit.SmwCounters.Snes;
-using LiveSplit.UI;
 
 namespace LiveSplit.SmwCounters.Counters;
 
-internal enum MoonDedupeMode { All, PerLevel }
-
-internal sealed class MoonCounter : ISmwCounter
+// Counts 3-up moon collections. A BankedCounter since v0.6.x — but the
+// "Discard on death" toggle defaults OFF for moons (settings-level default),
+// so out of the box this displays the plain never-reverted history, identical
+// to the old standalone counter. Toggled on, moons show gold until a
+// midway/exit banks them and a death discards unbanked ones.
+//
+// The per-level dedupe mode was dropped 2026-08-04: it served one
+// hypothetical challenge run and interacted badly with death-reverts (the
+// dedupe would remember a discarded moon and refuse to recount it). Legacy
+// DedupeMode/DedupePerRoom layout elements load fine — they are simply never
+// read.
+internal sealed class MoonCounter : BankedCounter
 {
     // SNES WRAM addresses (from kaizosplits Memory.cs).
     private const int MoonCounterOffset = 0x13C5; // # of 3-up moons collected, per scene
-    private const int LevelNumOffset    = 0x13BF; // translevel number
     private const int GameModeOffset    = 0x0100;
 
     private const byte LevelMainMode    = 0x14;
@@ -21,40 +26,15 @@ internal sealed class MoonCounter : ISmwCounter
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.moon.png");
 
     private readonly PreviousByte previousMoon = new();
+    private readonly MidwayExitBankDetector bank = new();
 
-    // Levels where a moon has already been counted this session.
-    // Only used in PerLevel mode.
-    private readonly HashSet<int> countedKeys = new();
+    public override string Id => "moons";
+    public override Image DefaultIcon => icon;
+    public override string DefaultLabel => "Moons";
+    protected override string SaveName => "Moons";
 
-    public string Id => "moons";
-    public Image DefaultIcon => icon;
-    public string DefaultLabel => "Moons";
-
-    public int Value { get; private set; }
-
-    public bool ValueIsAlert => false;
-
-    public MoonDedupeMode DedupeMode { get; set; } = MoonDedupeMode.All;
-
-    public int StateHash => Value * 397 ^ (int)DedupeMode;
-
-    public void Reset()
+    protected override int DetectCollectDelta(ISnesMemory memory)
     {
-        Value = 0;
-        countedKeys.Clear();
-        previousMoon.Clear();
-    }
-
-    public void SetValue(int value) => Value = value;
-
-    public void Poll(ISnesMemory memory)
-    {
-        if (!memory.IsAttached)
-        {
-            previousMoon.Clear();
-            return;
-        }
-
         // Only count while actually in a level. Outside a level (title,
         // file-select, overworld, load transitions) $13C5 holds transient data
         // whose changes fire spuriously — clear the baseline so re-entry
@@ -65,65 +45,23 @@ internal sealed class MoonCounter : ISmwCounter
         if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
         {
             previousMoon.Clear();
-            return;
+            return 0;
         }
-
         if (!memory.ReadWramByte(MoonCounterOffset, out byte moon))
         {
             previousMoon.Clear();
-            return;
+            return 0;
         }
-
-        if (previousMoon.HasPrevious && moon > previousMoon.Value)
-        {
-            if (DedupeMode == MoonDedupeMode.All)
-            {
-                Value++;
-            }
-            else
-            {
-                if (!memory.ReadWramByte(LevelNumOffset, out byte level))
-                {
-                    previousMoon.Clear();
-                    return;
-                }
-                if (countedKeys.Add(level)) { Value++; }
-            }
-        }
+        bool collected = previousMoon.HasPrevious && moon > previousMoon.Value;
         previousMoon.Set(moon);
+        return collected ? 1 : 0;
     }
 
-    public void SaveState(XmlDocument doc, XmlElement parent)
+    protected override bool DetectBank(ISnesMemory memory) => bank.DetectBank(memory);
+
+    protected override void ClearDetectors()
     {
-        SettingsHelper.CreateSetting(doc, parent, "Moons", Value);
-        SettingsHelper.CreateSetting(doc, parent, "DedupeMode", DedupeMode.ToString());
-    }
-
-    public void LoadState(XmlElement parent)
-    {
-        Value = SettingsHelper.ParseInt(parent["Moons"], 0);
-
-        // Try new DedupeMode string first; fall back to legacy PerRoom / DedupePerRoom
-        // values so old layouts don't error out on load.
-        XmlElement modeEl = parent["DedupeMode"];
-        if (modeEl != null && System.Enum.TryParse(modeEl.InnerText, out MoonDedupeMode mode))
-        {
-            DedupeMode = mode;
-        }
-        else if (modeEl != null && modeEl.InnerText == "PerRoom")
-        {
-            DedupeMode = MoonDedupeMode.PerLevel;   // Per Room dropped -> nearest
-        }
-        else if (SettingsHelper.ParseBool(parent["DedupePerRoom"], false))
-        {
-            DedupeMode = MoonDedupeMode.PerLevel;   // legacy bool
-        }
-        else
-        {
-            DedupeMode = MoonDedupeMode.All;        // default / "All"
-        }
-
-        countedKeys.Clear();
         previousMoon.Clear();
+        bank.Clear();
     }
 }

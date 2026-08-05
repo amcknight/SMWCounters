@@ -62,16 +62,15 @@ public class CounterPersistenceTests
     }
 
     [Fact]
-    public void MoonDedupeMode_SurvivesRoundTrip()
+    public void MoonValue_SurvivesRoundTrip()
     {
-        var c = new MoonCounter { DedupeMode = MoonDedupeMode.PerLevel };
+        var c = new MoonCounter();
         c.SetValue(2);
 
         var restored = new MoonCounter();
         RoundTrip(c, restored);
 
         Assert.Equal(2, restored.Value);
-        Assert.Equal(MoonDedupeMode.PerLevel, restored.DedupeMode);
         Assert.Equal(((ISmwCounter)c).StateHash, ((ISmwCounter)restored).StateHash);
     }
 
