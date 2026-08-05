@@ -97,12 +97,13 @@ public class SmwCountersComponent : IComponent
 
         // Wire up per-counter rows. Counter-specific extras live here so the
         // settings UserControl doesn't know about individual counter types.
-        var rows = new List<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue, Action RefreshExtras)>();
+        var rows = new List<(string Id, string DefaultLabel, bool HasBankToggle, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue, Action RefreshExtras)>();
         foreach (ISmwCounter c in counters)
         {
             ISmwCounter counter = c; // capture per-iteration
             (Control extras, Action refreshExtras) = BuildExtras(counter);
-            rows.Add((counter.Id, counter.DefaultLabel, extras, () => counter.Reset(),
+            bool hasBankToggle = counter is IBankToggleCounter { HasBankToggle: true };
+            rows.Add((counter.Id, counter.DefaultLabel, hasBankToggle, extras, () => counter.Reset(),
                       () => counter.Value, v => counter.SetValue(v), refreshExtras));
         }
         Settings.BuildUi(rows);

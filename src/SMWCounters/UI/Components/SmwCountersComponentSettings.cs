@@ -17,8 +17,17 @@ public class SmwCountersComponentSettings : UserControl
     public CompositeHook Hook { get; }
 
     private readonly HashSet<string> enabled = new() { "deaths", "exits" };
-    // Counters with banking turned OFF (plain-tally). Absent id => banking ON.
-    private readonly HashSet<string> bankDisabled = new();
+
+    // Per-counter "Discard on death" values. Ids absent from the map use
+    // DefaultBankOnSave — an explicit map (unlike the pre-v0.6 BankDisabled
+    // set) can tell "user turned it on" apart from "never seen", which is what
+    // lets moons default OFF while everything else defaults ON.
+    private readonly Dictionary<string, bool> bankOnSave = new();
+
+    // Toggle-carrying counter ids, captured by BuildUi. Serialization writes
+    // one explicit entry per id so future default changes can't reinterpret
+    // existing layouts.
+    private readonly List<string> toggleIds = new();
 
     public KeyOrButton ResetKey { get; set; }
     public int RowHeight { get; set; } = 45;
@@ -60,15 +69,18 @@ public class SmwCountersComponentSettings : UserControl
     }
 
     // Component calls this once at construction with the list of known counters.
-    public void BuildUi(IReadOnlyList<(string Id, string DefaultLabel, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue, Action RefreshExtras)> counters)
+    public void BuildUi(IReadOnlyList<(string Id, string DefaultLabel, bool HasBankToggle, Control Extras, Action ResetValue, Func<int> GetValue, Action<int> SetValue, Action RefreshExtras)> counters)
     {
         Controls.Clear();
         rows.Clear();
+        toggleIds.Clear();
 
         int y = 10;
 
-        foreach ((string id, string defaultLabel, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue, Action refreshExtras) in counters)
+        foreach ((string id, string defaultLabel, bool hasBankToggle, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue, Action refreshExtras) in counters)
         {
+            if (hasBankToggle) { toggleIds.Add(id); }
+
             var row = new CounterRow
             {
                 Id = id,
@@ -433,13 +445,14 @@ public class SmwCountersComponentSettings : UserControl
         else { enabled.Remove(counterId); }
     }
 
-    public bool IsBankOnSave(string counterId) => !bankDisabled.Contains(counterId);
+    public bool IsBankOnSave(string counterId)
+        => bankOnSave.TryGetValue(counterId, out bool value) ? value : DefaultBankOnSave(counterId);
 
-    public void SetBankOnSave(string counterId, bool value)
-    {
-        if (value) { bankDisabled.Remove(counterId); }
-        else { bankDisabled.Add(counterId); }
-    }
+    public void SetBankOnSave(string counterId, bool value) => bankOnSave[counterId] = value;
+
+    // Moons banking is opt-in (a moon lost to a death revert feels punitive by
+    // default); every other toggle counter keeps the established default ON.
+    internal static bool DefaultBankOnSave(string counterId) => counterId != "moons";
 
     public XmlNode GetSettings(XmlDocument document)
     {
@@ -470,13 +483,30 @@ public class SmwCountersComponentSettings : UserControl
             }
         }
 
-        bankDisabled.Clear();
+        bankOnSave.Clear();
+        XmlElement bankMapNode = e["BankOnSave"];
+        if (bankMapNode != null)
+        {
+            foreach (XmlElement c in bankMapNode.GetElementsByTagName("Counter"))
+            {
+                string id = c.GetAttribute("id");
+                if (!string.IsNullOrEmpty(id) && bool.TryParse(c.InnerText, out bool on))
+                {
+                    bankOnSave[id] = on;
+                }
+            }
+        }
+        // Legacy pre-v0.6 layouts: BankDisabled membership meant "toggle off";
+        // ids absent from both structures fall through to DefaultBankOnSave.
         XmlElement bankNode = e["BankDisabled"];
         if (bankNode != null)
         {
             foreach (XmlElement c in bankNode.GetElementsByTagName("Counter"))
             {
-                if (!string.IsNullOrEmpty(c.InnerText)) { bankDisabled.Add(c.InnerText); }
+                if (!string.IsNullOrEmpty(c.InnerText) && !bankOnSave.ContainsKey(c.InnerText))
+                {
+                    bankOnSave[c.InnerText] = false;
+                }
             }
         }
 
@@ -495,6 +525,12 @@ public class SmwCountersComponentSettings : UserControl
         hash ^= SettingsHelper.CreateSetting(document, parent, "DebugLog", DebugLog);
         hash ^= SettingsHelper.CreateSetting(document, parent, "ShowStatusDot", ShowStatusDot);
 
+        var bankPairs = new List<KeyValuePair<string, bool>>();
+        foreach (string id in toggleIds)
+        {
+            bankPairs.Add(new KeyValuePair<string, bool>(id, IsBankOnSave(id)));
+        }
+
         if (document != null && parent != null)
         {
             XmlElement enabledNode = document.CreateElement("EnabledCounters");
@@ -506,32 +542,34 @@ public class SmwCountersComponentSettings : UserControl
             }
             parent.AppendChild(enabledNode);
 
-            XmlElement bankNode = document.CreateElement("BankDisabled");
-            foreach (string id in bankDisabled)
+            XmlElement bankMapNode = document.CreateElement("BankOnSave");
+            foreach (KeyValuePair<string, bool> kv in bankPairs)
             {
                 XmlElement c = document.CreateElement("Counter");
-                c.InnerText = id;
-                bankNode.AppendChild(c);
+                c.SetAttribute("id", kv.Key);
+                c.InnerText = kv.Value.ToString();
+                bankMapNode.AppendChild(c);
             }
-            parent.AppendChild(bankNode);
+            parent.AppendChild(bankMapNode);
         }
 
-        return CombineSetHashes(hash, enabled, bankDisabled);
+        return CombineSetHashes(hash, enabled, bankPairs);
     }
 
-    // Fold the two id sets into the settings hash. Each set folds
-    // commutatively (HashSet iteration order is unspecified) into its own
-    // sub-hash, then the sub-hashes combine order-sensitively — an id in
-    // `enabled` can no longer cancel the same id in `bankDisabled`, which
-    // previously made {enabled:[x], bankDisabled:[x]} hash like {}.
-    // Static and internal so tests can pin the collision fix without
-    // constructing this control (and its CompositeHook).
-    internal static int CombineSetHashes(int hash, IEnumerable<string> enabledIds, IEnumerable<string> bankDisabledIds)
+    // Fold the enabled set and the BankOnSave pairs into the settings hash.
+    // Each structure folds commutatively (iteration order is unspecified) into
+    // its own sub-hash with a value-dependent salt for the pairs, then the
+    // sub-hashes combine order-sensitively so the structures can't cancel.
+    internal static int CombineSetHashes(int hash, IEnumerable<string> enabledIds,
+        IEnumerable<KeyValuePair<string, bool>> bankOnSave)
     {
         int enabledHash = 0;
         int bankHash = 0;
         foreach (string id in enabledIds) { enabledHash ^= id.GetHashCode(); }
-        foreach (string id in bankDisabledIds) { bankHash ^= id.GetHashCode(); }
+        foreach (KeyValuePair<string, bool> kv in bankOnSave)
+        {
+            bankHash ^= kv.Key.GetHashCode() * (kv.Value ? 397 : 31);
+        }
         hash = hash * 397 ^ enabledHash;
         return hash * 397 ^ bankHash;
     }

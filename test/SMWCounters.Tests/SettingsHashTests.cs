@@ -1,49 +1,62 @@
+using System.Collections.Generic;
+
 using LiveSplit.UI.Components;
 using Xunit;
 
 namespace SMWCounters.Tests;
 
-// The settings hash previously XORed enabled ids and bankDisabled ids into
-// one accumulator, so an id present in both sets cancelled out:
-// {enabled:[coins], bankDisabled:[coins]} hashed identically to {} and the
-// user's change never dirtied the layout. These tests pin the salted fold.
-// CombineSetHashes is static so no WinForms control (and no CompositeHook)
-// is constructed in tests.
+// The settings hash folds the enabled set and the BankOnSave map with
+// distinct salts so an id appearing in both cannot cancel out, and so
+// flipping a toggle VALUE (not just membership) dirties the layout.
+// Static so no WinForms control (and no CompositeHook) is constructed.
 public class SettingsHashTests
 {
     private static readonly string[] None = System.Array.Empty<string>();
+    private static readonly KeyValuePair<string, bool>[] NoBank =
+        System.Array.Empty<KeyValuePair<string, bool>>();
+
+    private static KeyValuePair<string, bool> On(string id) => new(id, true);
+    private static KeyValuePair<string, bool> Off(string id) => new(id, false);
 
     [Fact]
-    public void IdInBothSets_DoesNotCancelToEmpty()
+    public void IdInBothStructures_DoesNotCancelToEmpty()
     {
-        int both = SmwCountersComponentSettings.CombineSetHashes(0, new[] { "coins" }, new[] { "coins" });
-        int neither = SmwCountersComponentSettings.CombineSetHashes(0, None, None);
+        int both = SmwCountersComponentSettings.CombineSetHashes(0, new[] { "coins" }, new[] { Off("coins") });
+        int neither = SmwCountersComponentSettings.CombineSetHashes(0, None, NoBank);
         Assert.NotEqual(neither, both);
     }
 
     [Fact]
-    public void SameId_DifferentSet_HashesDifferently()
+    public void SameId_DifferentStructure_HashesDifferently()
     {
-        int inEnabled = SmwCountersComponentSettings.CombineSetHashes(0, new[] { "coins" }, None);
-        int inBank = SmwCountersComponentSettings.CombineSetHashes(0, None, new[] { "coins" });
+        int inEnabled = SmwCountersComponentSettings.CombineSetHashes(0, new[] { "coins" }, NoBank);
+        int inBank = SmwCountersComponentSettings.CombineSetHashes(0, None, new[] { Off("coins") });
         Assert.NotEqual(inEnabled, inBank);
     }
 
     [Fact]
-    public void TogglingBankDisabled_ChangesHash()
+    public void FlippingAToggleValue_ChangesTheHash()
     {
-        int on = SmwCountersComponentSettings.CombineSetHashes(0, new[] { "deaths", "coins" }, None);
-        int off = SmwCountersComponentSettings.CombineSetHashes(0, new[] { "deaths", "coins" }, new[] { "coins" });
+        int on = SmwCountersComponentSettings.CombineSetHashes(0, None, new[] { On("coins") });
+        int off = SmwCountersComponentSettings.CombineSetHashes(0, None, new[] { Off("coins") });
         Assert.NotEqual(on, off);
     }
 
     [Fact]
-    public void SetIterationOrder_DoesNotMatter()
+    public void IterationOrder_DoesNotMatter()
     {
-        // enabled/bankDisabled are HashSets — the hash must not depend on
-        // iteration order, only on membership.
-        int ab = SmwCountersComponentSettings.CombineSetHashes(7, new[] { "a", "b" }, None);
-        int ba = SmwCountersComponentSettings.CombineSetHashes(7, new[] { "b", "a" }, None);
+        int ab = SmwCountersComponentSettings.CombineSetHashes(7, new[] { "a", "b" }, new[] { On("x"), Off("y") });
+        int ba = SmwCountersComponentSettings.CombineSetHashes(7, new[] { "b", "a" }, new[] { Off("y"), On("x") });
         Assert.Equal(ab, ba);
+    }
+
+    [Fact]
+    public void DefaultBankOnSave_MoonsOff_EverythingElseOn()
+    {
+        Assert.False(SmwCountersComponentSettings.DefaultBankOnSave("moons"));
+        Assert.True(SmwCountersComponentSettings.DefaultBankOnSave("kills"));
+        Assert.True(SmwCountersComponentSettings.DefaultBankOnSave("jumps"));
+        Assert.True(SmwCountersComponentSettings.DefaultBankOnSave("coins"));
+        Assert.True(SmwCountersComponentSettings.DefaultBankOnSave("powerups"));
     }
 }
