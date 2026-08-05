@@ -204,6 +204,34 @@ public class SmwCountersComponent : IComponent
         // Ended sees the values as of the split.
         endedFreeze.OnPhase(state.CurrentPhase == TimerPhase.Ended, counters);
 
+        // Sync each counter's display-selector Banked flag from the
+        // "Discard on death" setting every tick, regardless of timer phase.
+        // Banked picks which of a counter's two always-tracked histories
+        // Value returns, and the settings row's value box mirrors Value. If
+        // this sync only ran while the timer was active, flipping the
+        // checkbox while paused or before a run started would leave the
+        // value box showing the old history until the timer resumed — and a
+        // user who then focused/tabbed that stale box would have
+        // CommitValue's Leave handler call SetValue(stale), collapsing the
+        // counter's real total/saved/plain histories down to that stale
+        // number. Running the sync unconditionally, and nudging the value
+        // boxes when it actually changes something, closes that window to
+        // well under one poll tick (~15 ms).
+        bool bankedChanged = false;
+        foreach (ISmwCounter c in counters)
+        {
+            if (c is IBankToggleCounter { HasBankToggle: true } bc)
+            {
+                bool wantBanked = Settings.IsBankOnSave(c.Id);
+                if (bc.Banked != wantBanked)
+                {
+                    bc.Banked = wantBanked;
+                    bankedChanged = true;
+                }
+            }
+        }
+        if (bankedChanged) { Settings.RefreshValueBoxes(); }
+
         if (!timerActive)
         {
             // Flush every counter's previous-byte state (enabled or not) so
@@ -223,7 +251,6 @@ public class SmwCountersComponent : IComponent
         // state, so a mid-run detach can't bridge stale samples on reattach.
         foreach (ISmwCounter c in counters)
         {
-            if (c is IBankToggleCounter { HasBankToggle: true } bc) { bc.Banked = Settings.IsBankOnSave(c.Id); }
             // Every counter polls the live connection, enabled or not: the
             // enabled set controls what the overlay *shows*, not what counts.
             // Turning a counter on mid-run then reveals the tally it has been
@@ -457,8 +484,9 @@ public class SmwCountersComponent : IComponent
             // commutative and self-inverse, so two counters holding equal
             // values cancel out and the layout hash misses real changes.
             // StateHash (not Value) so persisted-but-hidden state — banked
-            // `saved`, moon dedupe mode, the off-display kill tally — also
-            // dirties the hash instead of silently dropping on save.
+            // `saved`, the never-reverted `plain` history, the off-display
+            // kill tally — also dirties the hash instead of silently
+            // dropping on save.
             hash = hash * 397 ^ c.StateHash;
         }
         return hash;
