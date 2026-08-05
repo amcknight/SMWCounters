@@ -659,4 +659,107 @@ public class KillCounterTests
         Assert.Equal(0, Kills(c));                            // no posthumous kill
         Assert.Equal(0, Destruction(c));
     }
+
+    [Fact]
+    public void Alert_TracksTheDisplayedTallysUnbankedState()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        PollSlot0(c, m, Carryable, PSwitch);
+        PollSlot0(c, m, Spinjump, PSwitch);   // kills 0, destruction 1 (unbanked)
+        c.Mode = KillCountMode.Kills;
+        Assert.False(c.ValueIsAlert);          // kills 0 == killsSaved 0
+        c.Mode = KillCountMode.Destruction;
+        Assert.True(c.ValueIsAlert);           // destruction 1 != saved 0
+    }
+
+    [Fact]
+    public void BankedOff_ShowsThePlainHistory_NeverAlerts()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        m.SetByte(Anim, 0);
+        PollSlot0(c, m, Alive);
+        PollSlot0(c, m, Spinjump);            // 1/1 unbanked
+        m.SetByte(Anim, 9);
+        PollSlot0(c, m, Spinjump);            // die: banked history reverts
+        Assert.Equal(0, Kills(c));            // banked view
+        c.Banked = false;
+        c.Mode = KillCountMode.Kills;
+        Assert.Equal(1, c.Value);             // plain view remembers the kill
+        Assert.False(c.ValueIsAlert);
+    }
+
+    [Fact]
+    public void SetValue_SetsAllThreeHistoriesOfTheDisplayedTally()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        c.Mode = KillCountMode.Kills;
+        c.SetValue(5);
+        m.SetByte(Anim, 0);
+        PollSlot0(c, m, Alive);
+        m.SetByte(Anim, 9);
+        PollSlot0(c, m, Alive);               // die: revert is a no-op (saved is 5)
+        Assert.Equal(5, Kills(c));
+        Assert.False(c.ValueIsAlert);
+        c.Banked = false;
+        c.Mode = KillCountMode.Kills;
+        Assert.Equal(5, c.Value);             // plain was set too
+    }
+
+    [Fact]
+    public void SaveLoad_RoundTripsAllSixValues()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory();
+        m.SetByte(Anim, 0);
+        PollSlot0(c, m, Alive);
+        PollSlot0(c, m, Spinjump);            // 1/1, saveds 0, plains 1
+        m.SetByte(Anim, 9);
+        PollSlot0(c, m, Spinjump);            // die: tallies 0, plains 1
+
+        var doc = new XmlDocument();
+        var parent = doc.CreateElement("kills");
+        c.SaveState(doc, parent);
+        Assert.Equal("0", parent["Kills"].InnerText);
+        Assert.Equal("0", parent["KillsSaved"].InnerText);
+        Assert.Equal("1", parent["KillsPlain"].InnerText);
+        Assert.Equal("1", parent["DestructionPlain"].InnerText);
+
+        var restored = new KillCounter();
+        restored.LoadState(parent);
+        restored.Mode = KillCountMode.Kills;
+        Assert.Equal(0, restored.Value);
+        restored.Banked = false;
+        Assert.Equal(1, restored.Value);
+    }
+
+    [Fact]
+    public void LoadLegacyDocument_TreatsTalliesAsFullyBanked()
+    {
+        var doc = new XmlDocument();
+        var parent = doc.CreateElement("kills");
+        var kills = doc.CreateElement("Kills");
+        kills.InnerText = "5";
+        parent.AppendChild(kills);
+
+        var c = new KillCounter();
+        c.LoadState(parent);
+        c.Mode = KillCountMode.Kills;
+        Assert.Equal(5, c.Value);
+        Assert.False(c.ValueIsAlert);          // saved defaulted to the tally
+        c.Banked = false;
+        Assert.Equal(5, c.Value);              // plain defaulted to the tally
+    }
+
+    [Fact]
+    public void StateHash_SeesSavedAndPlain_NotJustTheDisplayedValue()
+    {
+        var a = new KillCounter(); var m = new FakeSnesMemory();
+        m.SetByte(Anim, 0);
+        PollSlot0(a, m, Alive);
+        PollSlot0(a, m, Spinjump);
+        m.SetByte(Anim, 9);
+        PollSlot0(a, m, Spinjump);            // displayed kills 0, plain 1
+        var b = new KillCounter();            // untouched: everything 0
+        Assert.Equal(Kills(a), Kills(b));
+        Assert.NotEqual(((ISmwCounter)a).StateHash, ((ISmwCounter)b).StateHash);
+    }
 }

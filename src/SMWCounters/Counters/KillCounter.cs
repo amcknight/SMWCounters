@@ -136,18 +136,41 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
     public bool Banked { get; set; } = true;
     public bool HasBankToggle => true;
 
-    public int Value => Mode == KillCountMode.Kills ? kills : destruction;
+    public int Value => Mode == KillCountMode.Kills
+        ? (Banked ? kills : killsPlain)
+        : (Banked ? destruction : destructionPlain);
 
-    // Layout-dirty hash input: both tallies and the mode are persisted, so all
-    // three must influence the settings hash even while only one displays.
-    public int StateHash => kills ^ (destruction * 397) ^ (int)Mode;
+    // Gold while the displayed tally has unbanked events; the plain view never
+    // alerts (nothing is ever at risk there).
+    public bool ValueIsAlert => Banked
+        && (Mode == KillCountMode.Kills ? kills != killsSaved : destruction != destructionSaved);
 
-    public bool ValueIsAlert => false;
+    // Everything SaveState persists feeds the hash — a bank commit or a plain
+    // divergence changes what gets written without moving the displayed Value.
+    public int StateHash
+    {
+        get
+        {
+            int h = kills;
+            h = h * 397 ^ destruction;
+            h = h * 397 ^ killsSaved;
+            h = h * 397 ^ destructionSaved;
+            h = h * 397 ^ killsPlain;
+            h = h * 397 ^ destructionPlain;
+            return h * 397 ^ (int)Mode;
+        }
+    }
 
     public void SetValue(int value)
     {
-        if (Mode == KillCountMode.Kills) { kills = value; }
-        else { destruction = value; }
+        if (Mode == KillCountMode.Kills)
+        {
+            kills = value; killsSaved = value; killsPlain = value;
+        }
+        else
+        {
+            destruction = value; destructionSaved = value; destructionPlain = value;
+        }
     }
 
     public void Reset()
@@ -417,7 +440,11 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
     public void SaveState(XmlDocument doc, XmlElement parent)
     {
         SettingsHelper.CreateSetting(doc, parent, "Kills", kills);
+        SettingsHelper.CreateSetting(doc, parent, "KillsSaved", killsSaved);
+        SettingsHelper.CreateSetting(doc, parent, "KillsPlain", killsPlain);
         SettingsHelper.CreateSetting(doc, parent, "Destruction", destruction);
+        SettingsHelper.CreateSetting(doc, parent, "DestructionSaved", destructionSaved);
+        SettingsHelper.CreateSetting(doc, parent, "DestructionPlain", destructionPlain);
         SettingsHelper.CreateSetting(doc, parent, "KillMode", Mode.ToString());
     }
 
@@ -425,6 +452,11 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
     {
         kills = SettingsHelper.ParseInt(parent["Kills"], 0);
         destruction = SettingsHelper.ParseInt(parent["Destruction"], 0);
+        // Back-compat: pre-v0.6 layouts have no Saved/Plain -> treat as fully banked.
+        killsSaved = SettingsHelper.ParseInt(parent["KillsSaved"], kills);
+        killsPlain = SettingsHelper.ParseInt(parent["KillsPlain"], kills);
+        destructionSaved = SettingsHelper.ParseInt(parent["DestructionSaved"], destruction);
+        destructionPlain = SettingsHelper.ParseInt(parent["DestructionPlain"], destruction);
 
         XmlElement modeEl = parent["KillMode"];
         Mode = modeEl != null && System.Enum.TryParse(modeEl.InnerText, out KillCountMode mode)
