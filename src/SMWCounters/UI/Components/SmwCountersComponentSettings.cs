@@ -54,6 +54,7 @@ public class SmwCountersComponentSettings : UserControl
     private CheckBox chkDebugLog;
     private Label lblManyCounters;
     private Label lblStatus;
+    private readonly ToolTip bankToolTip = new();
 
     private sealed class CounterRow
     {
@@ -61,6 +62,7 @@ public class SmwCountersComponentSettings : UserControl
         public CheckBox Enable;
         public TextBox ValueBox;
         public Button ResetValue;
+        public CheckBox BankToggle;
         public Action OnResetValue;
         public Func<int> GetValue;
         public Action<int> SetValue;
@@ -77,10 +79,20 @@ public class SmwCountersComponentSettings : UserControl
 
         int y = 10;
 
+        var lblBank = new Label
+        {
+            Text = "Discard on death",
+            Location = new Point(232, y),
+            AutoSize = true,
+        };
+        bankToolTip.SetToolTip(lblBank,
+            "Unbanked collects (shown gold) are discarded if you die before a checkpoint or exit. " +
+            "Both histories are always tracked — the checkbox only picks which one is shown.");
+        Controls.Add(lblBank);
+        y += 20;
+
         foreach ((string id, string defaultLabel, bool hasBankToggle, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue, Action refreshExtras) in counters)
         {
-            if (hasBankToggle) { toggleIds.Add(id); }
-
             var row = new CounterRow
             {
                 Id = id,
@@ -127,6 +139,20 @@ public class SmwCountersComponentSettings : UserControl
             };
             row.ResetValue.Click += (_, __) => { row.OnResetValue?.Invoke(); row.ValueBox.Text = row.GetValue().ToString(); };
             Controls.Add(row.ResetValue);
+
+            if (hasBankToggle)
+            {
+                toggleIds.Add(id);
+                row.BankToggle = new CheckBox
+                {
+                    Location = new Point(252, y + 2),
+                    AutoSize = true,
+                    Checked = IsBankOnSave(id),
+                };
+                row.BankToggle.CheckedChanged += (_, __) => SetBankOnSave(id, row.BankToggle.Checked);
+                bankToolTip.SetToolTip(row.BankToggle, "Discard on death for " + defaultLabel + ".");
+                Controls.Add(row.BankToggle);
+            }
 
             if (extras != null)
             {
@@ -298,6 +324,7 @@ public class SmwCountersComponentSettings : UserControl
         bool on = row.Enable.Checked;
         row.ValueBox.Enabled = on;
         row.ResetValue.Enabled = on;
+        if (row.BankToggle != null) { row.BankToggle.Enabled = on; }
         if (row.CounterSpecific != null) { row.CounterSpecific.Enabled = on; }
     }
 
@@ -317,6 +344,7 @@ public class SmwCountersComponentSettings : UserControl
         {
             row.Enable.Checked = IsEnabled(row.Id);
             row.ValueBox.Text = row.GetValue().ToString();
+            if (row.BankToggle != null) { row.BankToggle.Checked = IsBankOnSave(row.Id); }
             SyncRowEnabled(row);
             row.RefreshExtras?.Invoke();
         }

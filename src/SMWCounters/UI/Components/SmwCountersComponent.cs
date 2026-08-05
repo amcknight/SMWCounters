@@ -130,22 +130,6 @@ public class SmwCountersComponent : IComponent
 
     private (Control control, Action refresh) BuildExtras(ISmwCounter counter)
     {
-        if (counter is BankedCounter { HasBankToggle: true })
-        {
-            var chk = new CheckBox
-            {
-                Text = "Discard on death",
-                AutoSize = true,
-                Checked = Settings.IsBankOnSave(counter.Id),
-                Location = new Point(0, 4),
-            };
-            chk.CheckedChanged += (_, __) => Settings.SetBankOnSave(counter.Id, chk.Checked);
-            extrasToolTip.SetToolTip(chk, "Unbanked collects (shown gold) are discarded if you die before a checkpoint or exit.");
-            var panel = new Panel { Width = 160, Height = 24, Padding = new Padding(0) };
-            panel.Controls.Add(chk);
-            Action refresh = () => chk.Checked = Settings.IsBankOnSave(counter.Id);
-            return (panel, refresh);
-        }
         if (counter is KillCounter kill)
         {
             var rdoKills = new RadioButton
