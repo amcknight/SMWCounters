@@ -13,10 +13,7 @@ namespace LiveSplit.SmwCounters.Counters;
 // Value shows total; ValueIsAlert is true while total != saved (unbanked).
 internal abstract class BankedCounter : ISmwCounter
 {
-    private const int PlayerAnimationOffset = 0x0071;
-    private const byte DyingValue = 0x09;
-
-    private readonly PreviousByte previousDeathAnim = new();
+    private readonly DeathEdgeDetector deathEdge = new();
 
     protected int total;
     protected int saved;
@@ -50,7 +47,7 @@ internal abstract class BankedCounter : ISmwCounter
     {
         total = 0;
         saved = 0;
-        previousDeathAnim.Clear();
+        deathEdge.Clear();
         ClearDetectors();
     }
 
@@ -64,7 +61,7 @@ internal abstract class BankedCounter : ISmwCounter
     {
         if (!memory.IsAttached)
         {
-            previousDeathAnim.Clear();
+            deathEdge.Clear();
             ClearDetectors();
             return;
         }
@@ -78,18 +75,7 @@ internal abstract class BankedCounter : ISmwCounter
     }
 
     // Default die-to-discard: rising edge of $0071 to the dying value.
-    protected virtual bool DetectDeath(ISnesMemory memory)
-    {
-        if (!memory.ReadWramByte(PlayerAnimationOffset, out byte anim))
-        {
-            previousDeathAnim.Clear();
-            return false;
-        }
-        bool died = previousDeathAnim.HasPrevious
-            && previousDeathAnim.Value != DyingValue && anim == DyingValue;
-        previousDeathAnim.Set(anim);
-        return died;
-    }
+    protected virtual bool DetectDeath(ISnesMemory memory) => deathEdge.Detect(memory);
 
     // Number of collects detected this poll (0 = none). Most counters are
     // 0/1 edge detectors; coins arrive as multi-unit deltas.
@@ -108,7 +94,7 @@ internal abstract class BankedCounter : ISmwCounter
         total = SettingsHelper.ParseInt(parent[SaveName], 0);
         // Back-compat: pre-v0.2.0 layouts have no <Name>Saved -> treat as banked.
         saved = SettingsHelper.ParseInt(parent[SaveName + "Saved"], total);
-        previousDeathAnim.Clear();
+        deathEdge.Clear();
         ClearDetectors();
     }
 }
