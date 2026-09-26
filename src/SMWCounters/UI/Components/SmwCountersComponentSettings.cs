@@ -32,6 +32,8 @@ public class SmwCountersComponentSettings : UserControl
     public KeyOrButton ResetKey { get; set; }
     public int RowHeight { get; set; } = 45;
     public HAlignment Alignment { get; set; } = HAlignment.Center;
+    // Digits every value cell reserves room for before it starts widening.
+    public int ReserveDigits { get; set; } = ValueWidth.DefaultDigits;
     public bool ResetOnSplitsReset { get; set; } = true;
     public bool DebugLog { get; set; } = false;
     public bool ShowStatusDot { get; set; } = true;
@@ -46,6 +48,7 @@ public class SmwCountersComponentSettings : UserControl
     private readonly List<CounterRow> rows = new();
     private TextBox txtReset;
     private TrackBar trkHeight;
+    private NumericUpDown numReserveDigits;
     private RadioButton rdoLeft;
     private RadioButton rdoCenter;
     private RadioButton rdoRight;
@@ -232,6 +235,24 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(rdoLeft);
         Controls.Add(rdoCenter);
         Controls.Add(rdoRight);
+
+        // Same row as the alignment radios: both are layout-fit knobs.
+        Controls.Add(new Label
+        {
+            Text = "Reserve digits:",
+            Location = new Point(290, y + 4),
+            AutoSize = true,
+        });
+        numReserveDigits = new NumericUpDown
+        {
+            Minimum = ValueWidth.MinDigits,
+            Maximum = ValueWidth.MaxDigits,
+            Value = ValueWidth.ClampDigits(ReserveDigits),
+            Width = 42,
+            Location = new Point(385, y + 1),
+        };
+        numReserveDigits.ValueChanged += (_, __) => ReserveDigits = (int)numReserveDigits.Value;
+        Controls.Add(numReserveDigits);
         y += 30;
 
         chkResetOnSplitsReset = new CheckBox
@@ -351,6 +372,7 @@ public class SmwCountersComponentSettings : UserControl
         SyncManyCountersHint();
         if (txtReset != null) { txtReset.Text = FormatKey(ResetKey); }
         if (trkHeight != null) { trkHeight.Value = Math.Max(trkHeight.Minimum, Math.Min(trkHeight.Maximum, RowHeight)); }
+        if (numReserveDigits != null) { numReserveDigits.Value = ValueWidth.ClampDigits(ReserveDigits); }
         if (rdoLeft != null)
         {
             rdoLeft.Checked = Alignment == HAlignment.Left;
@@ -497,6 +519,7 @@ public class SmwCountersComponentSettings : UserControl
         ResetKey = rst != null && !string.IsNullOrEmpty(rst.InnerText) ? new KeyOrButton(rst.InnerText) : null;
         RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 45);
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
+        ReserveDigits = ValueWidth.ClampDigits(SettingsHelper.ParseInt(e["ReserveDigits"], ValueWidth.DefaultDigits));
         ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], true);
         DebugLog = SettingsHelper.ParseBool(e["DebugLog"], false);
         ShowStatusDot = SettingsHelper.ParseBool(e["ShowStatusDot"], true);
@@ -549,6 +572,7 @@ public class SmwCountersComponentSettings : UserControl
         hash ^= SettingsHelper.CreateSetting(document, parent, "ResetKey", ResetKey);
         hash ^= SettingsHelper.CreateSetting(document, parent, "RowHeight", RowHeight);
         hash ^= SettingsHelper.CreateSetting(document, parent, "Alignment", Alignment.ToString());
+        hash ^= SettingsHelper.CreateSetting(document, parent, "ReserveDigits", ReserveDigits);
         hash ^= SettingsHelper.CreateSetting(document, parent, "ResetOnSplitsReset", ResetOnSplitsReset);
         hash ^= SettingsHelper.CreateSetting(document, parent, "DebugLog", DebugLog);
         hash ^= SettingsHelper.CreateSetting(document, parent, "ShowStatusDot", ShowStatusDot);

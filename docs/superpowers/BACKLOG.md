@@ -75,8 +75,9 @@ challenge run "counts", not a technical question.
   while Cape/Fire appears to drop straight to Small, and may be hack-dependent.
   If ever done, a cape↔fire swap is +0 and +2 only when rising from Big or
   below.
-- **Reset-on-splits-reset default.** Currently off. Decide whether a fresh
-  install should clear counters on run reset by default.
+- **Reset-on-splits-reset default.** Currently on (a fresh install clears the
+  counters whenever the run resets). Decide whether that is the right default
+  for challenge runners who reset the timer more often than the attempt.
 - **Growing the kill exclusion list.** The `NotAlive` list is hardcoded and
   evidence-driven; it grows only with `PRP`/`SPR` log citations. Decide how
   much default-list growth to do before shipping the editable list (see

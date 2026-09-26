@@ -48,6 +48,9 @@ public class SmwCountersComponent : IComponent
     // SimpleLabel.Brush is a plain property (never disposed by the label), so
     // sharing cached brushes across labels is safe.
     private Font rowFont;
+    private Font reserveFont;
+    private int reserveDigits;
+    private float reserveWidth;
     private readonly Dictionary<int, SolidBrush> brushCache = new();
     private readonly System.Windows.Forms.ToolTip extrasToolTip = new();
 
@@ -319,7 +322,10 @@ public class SmwCountersComponent : IComponent
 
         // Measure each enabled counter's cell width: label-slot + " " + value.
         // Label slot is icon-aspect-scaled when the counter has an icon, else default-label text width.
+        // The value slot reserves room for Settings.ReserveDigits digits so a
+        // rollover inside the reserve does not shift the counters to its right.
         var enabled = counters.Where(c => Settings.IsEnabled(c.Id)).ToList();
+        float reserve = ReserveWidthFor(g, font, Settings.ReserveDigits);
         float totalWidth = 0f;
         var cellWidths = new Dictionary<string, (float labelW, float valueW)>();
         foreach (ISmwCounter c in enabled)
@@ -327,7 +333,8 @@ public class SmwCountersComponent : IComponent
             float labelW = c.DefaultIcon != null
                 ? IconWidthFor(c.DefaultIcon, iconHeight)
                 : g.MeasureString(c.DefaultLabel, font).Width;
-            float valueW = g.MeasureString(endedFreeze.ValueFor(c).ToString("0"), font).Width;
+            float measuredW = g.MeasureString(endedFreeze.ValueFor(c).ToString("0"), font).Width;
+            float valueW = ValueWidth.Cell(measuredW, reserve);
             cellWidths[c.Id] = (labelW, valueW);
             if (totalWidth > 0) { totalWidth += CellGap; }
             totalWidth += labelW + 4 + valueW;
@@ -375,6 +382,19 @@ public class SmwCountersComponent : IComponent
             valueCells[c.Id].Draw(g);
             x += valueW + CellGap;
         }
+    }
+
+    // The reserve depends only on the row font and the digit setting; both
+    // change rarely, so measure ten digit runs once per change, not per frame.
+    private float ReserveWidthFor(Graphics g, Font font, int digits)
+    {
+        if (!ReferenceEquals(reserveFont, font) || reserveDigits != digits)
+        {
+            reserveFont = font;
+            reserveDigits = digits;
+            reserveWidth = ValueWidth.Reserve(s => g.MeasureString(s, font).Width, digits);
+        }
+        return reserveWidth;
     }
 
     private Font GetRowFont(Font layoutFont)
