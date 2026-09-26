@@ -46,6 +46,41 @@ public class CoinCounterTests
     }
 
     [Fact]
+    public void WrapBurst_AtTheLimit_Counts_OneOver_Resyncs()
+    {
+        var c = new CoinCounter(); var m = new FakeSnesMemory();
+        Poll(c, m, LevelMainMode, 99);
+        Poll(c, m, LevelMainMode, 14);   // 99 -> 14 across the wrap: candidate 15 == MaxWrapBurst
+        Assert.Equal(15, c.Value);
+
+        var c2 = new CoinCounter(); var m2 = new FakeSnesMemory();
+        Poll(c2, m2, LevelMainMode, 99);
+        Poll(c2, m2, LevelMainMode, 15); // candidate 16: one over the limit, treated as a resync
+        Assert.Equal(0, c2.Value);
+    }
+
+    [Fact]
+    public void DeathAndCollect_SamePoll_DeathRevertsFirst_ThenCollectCounts()
+    {
+        var c = new CoinCounter(); var m = new FakeSnesMemory();
+        Poll(c, m, LevelMainMode, 0);
+        Poll(c, m, LevelMainMode, 4);            // +4 unbanked
+        Poll(c, m, LevelMainMode, 7, anim: 9);   // same poll: die (revert to 0) then +3
+        Assert.Equal(3, c.Value);
+        Assert.True(c.ValueIsAlert);
+    }
+
+    [Fact]
+    public void CollectAndBank_SamePoll_CollectLandsInTheBank()
+    {
+        var c = new CoinCounter(); var m = new FakeSnesMemory();
+        Poll(c, m, LevelMainMode, 0);
+        Poll(c, m, LevelMainMode, 2, midway: 1); // same poll: +2 then midway banks
+        Assert.Equal(2, c.Value);
+        Assert.False(c.ValueIsAlert);
+    }
+
+    [Fact]
     public void LargeDrop_IsResync_NotAWrap()
     {
         var c = new CoinCounter(); var m = new FakeSnesMemory();
