@@ -6,16 +6,32 @@ namespace SMWCounters.Tests;
 public class ExitCounterTests
 {
     // Full poll: fanfare ($0906), io ($1DFB), bossDefeat ($13C6),
-    // exitsCompleted ($1F2E), death anim ($0071).
+    // exitsCompleted ($1F2E), death anim ($0071). Game mode ($0100) defaults
+    // to level-main; the title screen is the one mode the exit gate rejects.
     private static void Poll(ExitCounter c, FakeSnesMemory m,
-        byte fanfare, byte io, byte bossDefeat, byte exits, byte anim)
+        byte fanfare, byte io, byte bossDefeat, byte exits, byte anim, byte mode = 0x14)
     {
         m.SetByte(0x0906, fanfare);
         m.SetByte(0x1DFB, io);
         m.SetByte(0x13C6, bossDefeat);
         m.SetByte(0x1F2E, exits);
         m.SetByte(0x0071, anim);
+        m.SetByte(0x0100, mode);
         c.Poll(m);
+    }
+
+    [Fact]
+    public void ExitsCompletedRisingOnTitleScreen_DoesNotBank()
+    {
+        var c = new ExitCounter();
+        var m = new FakeSnesMemory();
+        Poll(c, m, 0, 0, 0, 10, 0);
+        Poll(c, m, 1, 4, 0, 10, 0);          // goal: total=1, unbanked
+        Assert.True(c.ValueIsAlert);
+        Poll(c, m, 1, 4, 0, 11, 0, 0x07);    // $1F2E moves while on the title screen (file load)
+        Assert.True(c.ValueIsAlert);         // gate closed: still unbanked
+        Poll(c, m, 1, 4, 0, 12, 0, 0x0E);    // moves again on the overworld: banks
+        Assert.False(c.ValueIsAlert);
     }
 
     [Fact]

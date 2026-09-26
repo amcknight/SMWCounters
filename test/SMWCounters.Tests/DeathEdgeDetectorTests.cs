@@ -5,15 +5,18 @@ namespace SMWCounters.Tests;
 
 // The shared "$0071 rising edge to 9" death rule, extracted from
 // BankedCounter so KillCounter (dual tally, not a BankedCounter subclass)
-// can compose the identical discard edge.
+// can compose the identical discard edge. Gated on the game mode being past
+// the title/file-select screens, so the attract demo's level code can't fire it.
 public class DeathEdgeDetectorTests
 {
-    private const int Anim = 0x0071;
+    private const int Anim = 0x0071, GameMode = 0x0100;
     private const byte Dying = 0x09;
+    private const byte LevelMode = 0x14, TitleMode = 0x07, FileSelectMode = 0x09, FadeToOverworld = 0x0C;
 
-    private static bool Poll(DeathEdgeDetector d, FakeSnesMemory m, byte anim)
+    private static bool Poll(DeathEdgeDetector d, FakeSnesMemory m, byte anim, byte mode = LevelMode)
     {
         m.SetByte(Anim, anim);
+        m.SetByte(GameMode, mode);
         return d.Detect(m);
     }
 
@@ -53,5 +56,37 @@ public class DeathEdgeDetectorTests
         Assert.False(Poll(d, m, 0));
         d.Clear();
         Assert.False(Poll(d, m, Dying));  // baseline gone: no edge
+    }
+
+    [Fact]
+    public void TitleScreenDemoDeath_Ignored()
+    {
+        var d = new DeathEdgeDetector();
+        var m = new FakeSnesMemory();
+        Assert.False(Poll(d, m, 0, TitleMode));
+        Assert.False(Poll(d, m, Dying, TitleMode));   // the attract demo dying: not a death
+        Assert.False(Poll(d, m, 0, FileSelectMode));
+        Assert.False(Poll(d, m, Dying, FileSelectMode));
+    }
+
+    [Fact]
+    public void GateOpensFromFadeToOverworldOnward()
+    {
+        var d = new DeathEdgeDetector();
+        var m = new FakeSnesMemory();
+        Assert.False(Poll(d, m, 0, FadeToOverworld));
+        Assert.True(Poll(d, m, Dying, FadeToOverworld));
+    }
+
+    [Fact]
+    public void UnreadableGameMode_Ignored()
+    {
+        var d = new DeathEdgeDetector();
+        var m = new FakeSnesMemory();
+        Assert.False(Poll(d, m, 0));
+        m.SetByte(Anim, Dying);
+        var noMode = new FakeSnesMemory();
+        noMode.SetByte(Anim, Dying);
+        Assert.False(d.Detect(noMode));   // $0100 unreadable: gate closed
     }
 }

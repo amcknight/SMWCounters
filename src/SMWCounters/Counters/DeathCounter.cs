@@ -6,16 +6,14 @@ using LiveSplit.UI;
 
 namespace LiveSplit.SmwCounters.Counters;
 
+// One count per death edge. The rule itself ($0071 rising to 9, past the
+// title/file-select screens) lives in DeathEdgeDetector, shared with every
+// banked counter's discard edge so all of them agree on what a death is.
 internal sealed class DeathCounter : ISmwCounter
 {
-    // SNES address $7E:0071 — Mario player animation. 0x09 == "dying".
-    // Source: kaizosplits Watchers.cs (DiedNow => ShiftTo(playerAnimation, 9)).
-    private const int PlayerAnimationOffset = 0x71;
-    private const byte DyingValue = 0x09;
-
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.death.png");
 
-    private readonly PreviousByte previousAnimation = new();
+    private readonly DeathEdgeDetector deathEdge = new();
 
     public string Id => "deaths";
     public Image DefaultIcon => icon;
@@ -30,7 +28,7 @@ internal sealed class DeathCounter : ISmwCounter
     public void Reset()
     {
         Value = 0;
-        previousAnimation.Clear();
+        deathEdge.Clear();
     }
 
     public void SetValue(int value) => Value = value;
@@ -39,21 +37,11 @@ internal sealed class DeathCounter : ISmwCounter
     {
         if (!memory.IsAttached)
         {
-            previousAnimation.Clear();
+            deathEdge.Clear();
             return;
         }
 
-        if (!memory.ReadWramByte(PlayerAnimationOffset, out byte anim))
-        {
-            previousAnimation.Clear();
-            return;
-        }
-
-        if (previousAnimation.HasPrevious && previousAnimation.Value != DyingValue && anim == DyingValue)
-        {
-            Value++;
-        }
-        previousAnimation.Set(anim);
+        if (deathEdge.Detect(memory)) { Value++; }
     }
 
     public void SaveState(XmlDocument doc, XmlElement parent)
@@ -64,6 +52,6 @@ internal sealed class DeathCounter : ISmwCounter
     public void LoadState(XmlElement parent)
     {
         Value = SettingsHelper.ParseInt(parent["Deaths"], 0);
-        previousAnimation.Clear();
+        deathEdge.Clear();
     }
 }

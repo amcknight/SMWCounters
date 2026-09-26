@@ -11,6 +11,10 @@ namespace LiveSplit.SmwCounters.Counters;
 // collect), and on a save file that already owns the exit it never moves at all
 // — which used to strand every banked counter in the gold alert until a death
 // wiped it.
+//
+// Both signals are tracked in every game mode but only reported past the
+// title/file-select screens (PlayGate): loading a save file rewrites $1F2E
+// while still on the file select, and that must not bank anything.
 internal sealed class LevelExitDetector
 {
     private const int ExitModeOffset = 0x0DD5;
@@ -46,7 +50,7 @@ internal sealed class LevelExitDetector
         }
         else { previousExits.Clear(); }
 
-        return exited;
+        return exited && PlayGate.IsInPlay(memory);
     }
 
     public void Clear()

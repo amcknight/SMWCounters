@@ -30,6 +30,7 @@ public class SetValueTests
         m.SetByte(0x13C6, bossDefeat);
         m.SetByte(0x1F2E, exits);
         m.SetByte(0x0071, anim);
+        m.SetByte(0x0100, 0x14);
         c.Poll(m);
     }
 }
