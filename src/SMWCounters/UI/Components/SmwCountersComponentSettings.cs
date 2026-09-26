@@ -34,6 +34,10 @@ public class SmwCountersComponentSettings : UserControl
     public HAlignment Alignment { get; set; } = HAlignment.Center;
     // Digits every value cell reserves room for before it starts widening.
     public int ReserveDigits { get; set; } = ValueWidth.DefaultDigits;
+    // Keep polling and counting while the LiveSplit timer is not running
+    // (challenge runs that never start the timer). Off: counters only tally
+    // during a live run.
+    public bool CountWhileTimerStopped { get; set; } = false;
     public bool ResetOnSplitsReset { get; set; } = true;
     public bool DebugLog { get; set; } = false;
     public bool ShowStatusDot { get; set; } = true;
@@ -53,6 +57,7 @@ public class SmwCountersComponentSettings : UserControl
     private RadioButton rdoCenter;
     private RadioButton rdoRight;
     private CheckBox chkResetOnSplitsReset;
+    private CheckBox chkCountWhileTimerStopped;
     private CheckBox chkShowStatusDot;
     private CheckBox chkDebugLog;
     private Label lblManyCounters;
@@ -266,6 +271,17 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(chkResetOnSplitsReset);
         y += 28;
 
+        chkCountWhileTimerStopped = new CheckBox
+        {
+            Text = "Count while the timer is stopped (runs without a timer)",
+            Location = new Point(10, y),
+            AutoSize = true,
+            Checked = CountWhileTimerStopped,
+        };
+        chkCountWhileTimerStopped.CheckedChanged += (_, __) => CountWhileTimerStopped = chkCountWhileTimerStopped.Checked;
+        Controls.Add(chkCountWhileTimerStopped);
+        y += 28;
+
         chkShowStatusDot = new CheckBox
         {
             Text = "Show connection status pixel",
@@ -380,6 +396,7 @@ public class SmwCountersComponentSettings : UserControl
             rdoRight.Checked = Alignment == HAlignment.Right;
         }
         if (chkResetOnSplitsReset != null) { chkResetOnSplitsReset.Checked = ResetOnSplitsReset; }
+        if (chkCountWhileTimerStopped != null) { chkCountWhileTimerStopped.Checked = CountWhileTimerStopped; }
         if (chkShowStatusDot != null) { chkShowStatusDot.Checked = ShowStatusDot; }
         if (chkDebugLog != null) { chkDebugLog.Checked = DebugLog; }
         RegisterHotKeys();
@@ -521,6 +538,7 @@ public class SmwCountersComponentSettings : UserControl
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
         ReserveDigits = ValueWidth.ClampDigits(SettingsHelper.ParseInt(e["ReserveDigits"], ValueWidth.DefaultDigits));
         ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], true);
+        CountWhileTimerStopped = SettingsHelper.ParseBool(e["CountWhileTimerStopped"], false);
         DebugLog = SettingsHelper.ParseBool(e["DebugLog"], false);
         ShowStatusDot = SettingsHelper.ParseBool(e["ShowStatusDot"], true);
 
@@ -574,6 +592,7 @@ public class SmwCountersComponentSettings : UserControl
         hash ^= SettingsHelper.CreateSetting(document, parent, "Alignment", Alignment.ToString());
         hash ^= SettingsHelper.CreateSetting(document, parent, "ReserveDigits", ReserveDigits);
         hash ^= SettingsHelper.CreateSetting(document, parent, "ResetOnSplitsReset", ResetOnSplitsReset);
+        hash ^= SettingsHelper.CreateSetting(document, parent, "CountWhileTimerStopped", CountWhileTimerStopped);
         hash ^= SettingsHelper.CreateSetting(document, parent, "DebugLog", DebugLog);
         hash ^= SettingsHelper.CreateSetting(document, parent, "ShowStatusDot", ShowStatusDot);
 

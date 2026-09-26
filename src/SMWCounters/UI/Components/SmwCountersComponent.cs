@@ -191,17 +191,24 @@ public class SmwCountersComponent : IComponent
         connection.Tick();
         if (Settings.DebugLog) { debugLog.LogStatus(connection.Status, connection.WindowTitle); }
 
-        // Counters still only count during a live run. NotRunning covers
-        // title screen / file select / overworld-before-start (where SMW
-        // demos and casual play would otherwise pollute the counter). Paused
-        // counts as active so a pause/resume preserves edge continuity.
-        // Ended counts as active for timer parity: the counters keep tallying
-        // across a premature final split (display pinned by endedFreeze), so
-        // undoing the split reveals the true totals the way the timer jumps
-        // to where it would have been.
+        // By default counters only count during a live run. NotRunning covers
+        // title screen / file select / overworld-before-start, where casual
+        // play would otherwise pollute a run's tallies. Paused counts as
+        // active so a pause/resume preserves edge continuity. Ended counts as
+        // active for timer parity: the counters keep tallying across a
+        // premature final split (display pinned by endedFreeze), so undoing
+        // the split reveals the true totals the way the timer jumps to where
+        // it would have been.
+        //
+        // CountWhileTimerStopped lifts the NotRunning gate for runs that never
+        // start the timer. The title-screen attract demo is still excluded:
+        // every counter has an in-play game-mode gate of its own (PlayGate for
+        // deaths/exits, level-main for the collects), so the timer was never
+        // the only guard.
         bool timerActive = state.CurrentPhase == TimerPhase.Running
             || state.CurrentPhase == TimerPhase.Paused
             || state.CurrentPhase == TimerPhase.Ended;
+        bool counting = timerActive || Settings.CountWhileTimerStopped;
 
         // Before this tick's polling, so the capture on the transition into
         // Ended sees the values as of the split.
@@ -235,7 +242,7 @@ public class SmwCountersComponent : IComponent
         }
         if (bankedChanged) { Settings.RefreshValueBoxes(); }
 
-        if (!timerActive)
+        if (!counting)
         {
             // Flush every counter's previous-byte state (enabled or not) so
             // that resuming after a gap doesn't bridge a stale sample to a
@@ -270,16 +277,17 @@ public class SmwCountersComponent : IComponent
             return;
         }
 
+        string countingLabel = timerActive ? "Counting" : "Counting (timer stopped)";
         if (Settings.DebugLog)
         {
             debugLog.Poll(connection, counters, id => Settings.IsEnabled(id),
                           state.CurrentPhase.ToString(), connection.Describe());
-            Settings.SetStatus("Counting · " + connection.Describe() + " · debug log → " + debugLog.LogPath);
+            Settings.SetStatus(countingLabel + " · " + connection.Describe() + " · debug log → " + debugLog.LogPath);
         }
         else
         {
             debugLog.Close();
-            Settings.SetStatus("Counting · " + connection.Describe());
+            Settings.SetStatus(countingLabel + " · " + connection.Describe());
         }
     }
 
