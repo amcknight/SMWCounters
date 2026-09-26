@@ -91,18 +91,6 @@ public class SmwCountersComponentSettings : UserControl
 
         int y = 10;
 
-        var lblBank = new Label
-        {
-            Text = "Discard on death",
-            Location = new Point(232, y),
-            AutoSize = true,
-        };
-        bankToolTip.SetToolTip(lblBank,
-            "Unbanked collects (shown gold) are discarded if you die before a checkpoint or exit. " +
-            "Both histories are always tracked — the checkbox only picks which one is shown.");
-        Controls.Add(lblBank);
-        y += 20;
-
         foreach ((string id, string defaultLabel, bool hasBankToggle, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue, Action refreshExtras) in counters)
         {
             var row = new CounterRow
@@ -162,7 +150,9 @@ public class SmwCountersComponentSettings : UserControl
                     Checked = IsBankOnSave(id),
                 };
                 row.BankToggle.CheckedChanged += (_, __) => SetBankOnSave(id, row.BankToggle.Checked);
-                bankToolTip.SetToolTip(row.BankToggle, "Discard on death for " + defaultLabel + ".");
+                bankToolTip.SetToolTip(row.BankToggle,
+                    "Discard on death: unbanked " + defaultLabel + " (shown gold) are discarded if you die " +
+                    "before a checkpoint or exit. Both histories are always tracked; this only picks which one is shown.");
                 Controls.Add(row.BankToggle);
             }
 

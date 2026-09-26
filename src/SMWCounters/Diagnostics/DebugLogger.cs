@@ -71,6 +71,11 @@ internal sealed class DebugLogger
         ("exits",    0x1F2E),   // saved exit count (late backstop)
         ("lvl",      0x13BF),   // level number
         ("room",     0x010B),   // room number
+        ("mode",     0x0100),   // game mode — every transition, so a level
+                                // left by start+select / intro finish / side
+                                // exit shows its exitMode + lvl context
+        ("pstate",   0x0019),   // powerup state — midway/reserve powerup evidence
+        ("reserve",  0x0DC2),   // reserve-box item — collects that skip the grow
     };
 
     // Sprite tables.
