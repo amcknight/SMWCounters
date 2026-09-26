@@ -1,219 +1,179 @@
-# SMWCounters — Open Improvements & Threads
+# SMWCounters — Backlog
 
-Running list of ideas and unfinished threads, captured at the v0.2.0 cut. Not
-scheduled — a parking lot to pull from. Grouped by theme, roughly high-impact
-first within each group.
+Open work, grouped by what it takes to start. Entries carry the date of the
+evidence they rest on; resolved entries are deleted, not struck through.
+Last full refresh: 2026-09-26.
 
-## Counting semantics (SMW judgment calls)
+## Release-blocking (next public release)
 
-- **Yoshi as a powerup.** Whether/how having Yoshi counts toward a low% /
-  "least powerups" tally. Unresolved design (like the powerup-collect debate);
-  needs a rule that's clean and ungameable. Direction sketched 2026-07-27:
-  opt-in via a checkbox alongside the other powerup toggles. Easiest rule is
-  **count each mount**; ideal rule dedupes remounts of the *same* Yoshi
-  (identity via sprite slot? fragile across slot reuse) so hop-off/hop-on isn't
-  double-counted, while a respawned Yoshi legitimately counts as a second.
-  Needs a live observation session on Yoshi identity/slot behavior before any
-  design.
-- **Checkpoint (midway) as a powerup.** A midway that makes Mario big is
-  effectively a powerup, but it does **not** currently increment the Powerups
-  counter — the collect fires on the `$0071` grow *animation* (→2/3/4), and the
-  midway grow doesn't go through that path. Future: detect a midway that raises
-  `$0019` (powerup state) and optionally count it, with the earlier-discussed
-  "only count it if it actually made Mario big" toggle (skip patched midways
-  that do nothing). Hack-dependent; needs live-case work.
-- **Three-tier banking: Finish → Exit → Save.** Today the Exit counter collects
-  on the Finish (goal/orb/key/boss) and banks on the Exit write (`$1F2E`); a
-  death before the Exit reverts. A fuller model adds a **Save** tier: revert on
-  **game over** before the game actually saves (SRAM / castle prompt), separate
-  from the die-before-Exit revert. Could render stacked with distinct colors
-  (e.g. orange on Finish, yellow on banked-Exit, white on Save). Needs game-over
-  detection + a two-level banked model + multi-color rendering.
-- **Passivism counter needs new instrumentation.** The sprite-status table
-  (`$14C8`) cannot see non-lethal disturbance — bops, fireball hits, galoomba
-  flips, Chuck damage never touch the status byte — so a true "did I disturb
-  anything" counter is not buildable from it (established by the 2026-07-14
-  observation session; see the kills/destruction v2 spec). Research path:
-  extend `DebugLogger` to candidate WRAM (sprite stun timers, interaction
-  flags) and observe before designing anything.
-- **Editable kill-exclusion list (advanced UI).** The v2 Kills creature filter
-  is a hardcoded, evidence-driven sprite-ID list. Once it has seen real use,
-  expose it as an editable list (hex IDs) behind an advanced settings surface
-  so per-hack custom sprites can be reclassified. Path decided 2026-07-16: the
-  full "not alive" list is effectively impossible to complete by hand, so (1)
-  grow a best-effort default list from play sessions of the games actually
-  being run (PRP log lines make each candidate citable), then (2) expose the
-  list to the user as the escape hatch for everything else.
-- **"Goal tape doesn't kill" checkbox.** Creatures converted to coins by the
-  goal tape (`08->06`) currently count as Kills (bullet bill, chuck confirmed
-  2026-07-16). Add a kills-row setting to exclude goal-tape conversions from
-  the Kills tally for players who don't consider the tape a weapon —
-  status `06` entries would then count Destruction only.
-- **Goal-tape conversion-to-powerup doesn't kill (live report 2026-08-04).**
-  The mirror case of the entry above: hacks where the tape converts enemies to
-  powerups route through a live-slot despawn (`08->00`) on the goal-trigger
-  tick — same tick the tape self-converts `7B->06` and `$0906` fanfare flips,
-  all still in game mode `0x14` (log 2026-08-04 14:25:33) — so nothing enters
-  the dead set and no Kill counts. Rule direction: key on the goal-trigger
-  tick and harvest remembered live-creature slots despawning at it. Needs one
-  logged experiment (goal crossed with enemies onscreen, plus a non-goal exit
-  as control — `08->00` is also what ordinary offscreen despawns look like).
-  Design together with the "goal tape doesn't kill" checkbox above: one
-  setting should govern both conversion paths (coin `08->06` and powerup
-  despawn) instead of two half-rules.
-- **Property-based creature filter (replace/augment the NotAlive blacklist).**
-  The 2026-07-16 session showed the blacklist will keep growing (message box
-  `0xB9` counted at the goal tape) and is error-prone (`0x4B` was mislabeled
-  "chuck rock"; it's the pipe-dwelling Lakitu — the rock is `0x48`). SMW copies
-  six per-sprite "tweaker" property bytes into WRAM per slot
-  (`$1656/$1662/$166E/$167A/$1686/$190F`) with creature-adjacent bits
-  ("inedible", "don't turn into a coin when goal passed", …). The DebugLogger
-  now emits `PRP` lines dumping these bytes on every death/mouth entry; once a
-  few sessions of data exist, evaluate whether a bit predicate separates
-  creatures from objects. Until then, grow the blacklist only with `PRP`/`SPR`
-  log citations. Whitelist was considered and rejected (worse: silent
-  undercounting of every unlisted creature).
-- **Yoshi insta-eat rule — `$160E` is the lead.** Tonight's `YOS` lines show
-  Yoshi's per-slot `$160E` byte holds the tongue-target slot index (`FF` idle,
-  `FF->06` while grabbing slot 6). Insta-eaten sprites (piranha, koopaling,
-  spiny/pipe-lakitu eats) despawn without ever reaching mouth status 07, so the
-  rule is likely: target of an active tongue despawns 08->00 ⇒ eaten. `$18AC`
-  (swallow timer) is a noisy frame counter — probably only useful as a
-  confirmation edge, not a trigger. Needs one focused Yoshi session + follow-up
-  plan (v2 spec, "Yoshi insta-eat coverage").
-- **Disco-shell stomp doesn't count (koopa origin rule).** A disco shell dies
-  from kicked status (`0A->04`), which the koopa origin rule excludes from
-  Kills by design (observed 22:42:11, 2026-07-16). Debatable whether a
-  Yoshi-stomped disco shell "is" a creature kill; revisit if it grates.
-- **Dragon-coin persistence awareness (Coins counter).** Idea 2026-07-28: some
-  hacks patch dragon coins to stay collected across deaths (vanilla does not).
-  In those hacks a dragon-coin get is effectively already banked, and the
-  Coins counter's die-revert is wrong for that portion. Research path: find a
-  tell for "this hack saves dragon coins" — vanilla tracks the in-level count
-  at `$1422`; persistence patches typically maintain a per-level collected
-  bitfield in extra WRAM/SRAM. DebugLogger a candidate-WRAM session on a hack
-  known to save them (collect, die, watch what survives) before designing
-  anything. Edge case; only worth it if it grates in real runs.
-- **Weighted powerup counting (Cape/Fire = 2).** Parked. The rationale (Fire
-  "contains" two powerups) is shaky since a hit while Cape/Fire appears to drop
-  straight to Small, not Big, and may be hack-dependent. Revisit only with live
-  cases; if done, a cape↔fire swap must be +0 (lateral), +2 only when rising
-  from Big-or-below.
+The last public tag is v0.2.0 (2026-07-03). Coins, Kills/Destruction, the
+SNES.dll structural WRAM discovery, banked histories, and the discard-on-death
+column have all landed since and never shipped.
 
-## In-level gating (consistency)
+- **README refresh.** Describe the current counter set (Deaths, Exits, Coins,
+  Jumps, Moons, Powerups, Kills/Destruction), the discard-on-death column, the
+  status pixel colors as they are now, and the debug log. Drop the "Per room"
+  moon mode (removed). Add the layout screenshot the README has a TODO for.
+- **Version bump + tag.** The csproj says 0.5.0; nothing past v0.2.0 was ever
+  tagged. Bump, tag `vX.Y.Z`, and the release workflow stages the
+  `SMWCounters.dll` + `SNES.dll` zip.
 
-- **Done for collects; one deliberate holdout remains.** Powerups, Jumps, and
-  Moons all gate their collect on game mode `$0100 == 0x14` now (Jumps since
-  the v0.5.x rework, Moons fixed 2026-08-02). The one remaining `$1935 == 1`
-  gate is `MidwayExitBankDetector.DetectCheckpointEntrance` — kept on purpose
-  because it mirrors kaizosplits' `Watchers.CPEntrance` (`InLevel && ...`) and
-  suppresses the entrance-repoint noise during level load (live log 2026-08-02:
-  `BNK cp 63->18` arrives at `inLvl=00`, pre-level). Known blind spot: a custom
-  checkpoint inside a level type that never sets `$1935` (Yoshi-House-style)
-  would not bank. No live sighting yet; revisit only with a log citation.
+## Easy wins (no live session needed)
 
-## UI / UX
-
-- **Overflow handling.** When the enabled counters are wider than the available
-  layout width, either wrap to a second line or shrink to fit. **Decided
-  against for v0.5.0 (2026-07-27):** counter widths grow mid-run as digit
-  counts grow, so wrap would change the component's *height* mid-run —
-  confusing and annoying in a LiveSplit layout. If ever revisited, it needs
-  pre-emptively locked digit widths per counter. Chosen mitigation instead: a
-  settings hint when many counters are enabled, suggesting a second
-  SMWCounters instance stacked in the layout (ships in v0.5.0).
-- **Count-outside-active-run checkbox (idea 2026-08-04).** Opt-in setting to
-  keep the counters polling while the timer is not running (today NotRunning
-  flushes edge state and counts nothing — deliberate, so demos/casual play
-  don't pollute a run's tallies). Use case: practice/casual sessions where the
-  tallies are wanted without a live run. Open questions: does Reset still
-  zero? do banked counters bank/revert as normal? interaction with the
-  Ended-phase freeze (which already polls post-run) and with
-  `ResetOnSplitsReset`. Should be possible — the always-on connection and
-  the poll loop already run; the gate is one phase check in
-  `SmwCountersComponent.Poll`.
-- **Save/restore counter values for restarting a run.** Ideas floated: recover
-  the last values after a Reset/close — e.g. show the previous values greyed in
-  Settings with a "Recover" button, and/or expose it via right-click. Design
-  open. (Note: a right-click **menu** would shadow LiveSplit's own context menu
-  — see Dropped.)
-- **User-defined / advanced custom counters.** Let users define their own
-  counters from Settings (pick a WRAM address + edge/compare rule + label/icon),
-  rather than only the built-in set. Larger feature; needs a small rule DSL and
-  UI.
-- **Pending-kill gold/white rendering for fireball coins.** Idea from the
-  2026-07-16 session: when a creature is fireball-converted, show the would-be
-  kill in gold (like unbanked exits), revert it if the coin despawns
-  uncollected, and settle to white when the coin is collected. Requires the
-  counter to expose a "pending kills" count and the renderer to color partial
-  values; pairs naturally with the existing exit banking colors.
-- **Author line low% nudge.** The greyed author line currently just credits
-  twitch.tv/mangort. Could optionally add a short "try low%: min jumps /
-  powerups" suggestion. Deemed possibly intrusive; left as credit-only for now.
-- **Settings dialog is fixed-size** (not user-resizable). Minor; widen if it
-  ever feels cramped.
-- **Shareable settings code (idea 2026-07-28).** A textbox in Settings holding
-  a compact code that encodes the entire settings choice (enabled counters,
-  bank toggles, row height, alignment, etc.), copyable to send to a friend,
-  with a [Set] button beside it that applies an entered code. Effectively
-  serialize the existing settings XML to a short string (base64/deflate or a
-  custom compact form) and back. Not scheduled — wanted documented.
-
+- **Digit-width stability.** Each value's cell is measured from its actual
+  string every frame, so every digit rollover shifts everything to its right.
+  Reserve a minimum value width (widest digit glyph × N, one global setting,
+  default 3), left-align the value inside it, and let the cell grow only once
+  the value exceeds N digits. Prerequisite for the wrap idea under "Larger
+  features".
+- **Count while the timer is stopped.** Opt-in setting. Today NotRunning
+  flushes edge state and counts nothing, so demos and casual play cannot
+  pollute a run. Deaths and Exits are the only counters with no in-level gate
+  (Kills, Jumps, Powerups, Moons, Coins already require game mode `0x14`), so
+  the feature is two pieces: give the death and exit edges their own in-level
+  gate (mechanism to be chosen; `0x14` is the candidate, not the decision), then
+  add the flag. Reset still zeroes; banked counters bank/revert as normal; the
+  Ended-phase freeze is unaffected. Once gated, the attract-demo limitation
+  below closes.
 - **Coin tests: pin the `MaxWrapBurst` boundary and same-poll orderings.**
   Nothing asserts wrap candidate == 15 (counted) vs 16 (resync), death+collect
-  in one poll, or collect+bank in one poll. Cheap facts that would lock
-  `BankedCounter.Poll` ordering semantics (v0.5.0 final review).
+  in one poll, or collect+bank in one poll. Cheap facts that lock
+  `BankedCounter.Poll` ordering semantics.
+- **Kills-row radio buttons sit at a fixed x offset in Settings.** Possible
+  clipping at non-100% DPI; never confirmed. Check once at 125%/150%.
+- **Settings dialog is fixed-size.** Widen or make resizable if it ever feels
+  cramped.
+
+## Decisions needed (roadmap)
+
+Rules that need a call before any design. Each is a judgment about what a
+challenge run "counts", not a technical question.
+
+- **Yoshi as a powerup.** Whether having Yoshi counts toward a low% tally.
+  Direction (2026-07-27): opt-in checkbox beside the other powerup toggles.
+  Simplest rule counts each mount; the ideal rule dedupes remounts of the same
+  Yoshi (identity via sprite slot is fragile across slot reuse) while a
+  respawned Yoshi counts again. Needs a logged Yoshi session before design.
+- **Checkpoint (midway) as a powerup.** A midway that makes Mario big does not
+  increment Powerups today: the collect fires on the `$0071` grow animation
+  (→2/3/4) and the midway grow skips that path. Would detect a midway raising
+  `$0019` and count it, optionally only when it actually made Mario big (skip
+  patched no-op midways). Hack-dependent; needs live cases.
+- **Goal tape as a kill.** Two conversion paths, one setting should govern
+  both. (a) Coin conversion `08->06` currently counts as a Kill (bullet bill,
+  chuck confirmed 2026-07-16); a "goal tape doesn't kill" option would make
+  those Destruction only. (b) Powerup conversion in some hacks despawns the
+  live slot `08->00` on the goal-trigger tick (log 2026-08-04 14:25:33, still
+  in mode `0x14`), so today nothing counts at all. Rule direction: key on the
+  goal-trigger tick and harvest remembered live slots despawning at it. Needs
+  one logged experiment with a non-goal exit as control, since `08->00` is
+  also an ordinary offscreen despawn.
+- **Disco-shell stomp doesn't count.** Dies from kicked status (`0A->04`),
+  which the koopa origin rule excludes by design (observed 2026-07-16). Decide
+  whether a Yoshi-stomped disco shell is a creature kill.
+- **Weighted powerup counting (Cape/Fire = 2).** Rationale is shaky: a hit
+  while Cape/Fire appears to drop straight to Small, and may be hack-dependent.
+  If ever done, a cape↔fire swap is +0 and +2 only when rising from Big or
+  below.
+- **Reset-on-splits-reset default.** Currently off. Decide whether a fresh
+  install should clear counters on run reset by default.
+- **Growing the kill exclusion list.** The `NotAlive` list is hardcoded and
+  evidence-driven; it grows only with `PRP`/`SPR` log citations. Decide how
+  much default-list growth to do before shipping the editable list (see
+  "Advanced kill config").
+
+## Needs a logged session
+
+Research-gated: run a session with the debug log on, then design.
+
+- **Passivism counter.** The sprite-status table (`$14C8`) cannot see
+  non-lethal disturbance (bops, fireball hits, galoomba flips, Chuck damage
+  never touch the status byte), established 2026-07-14. Research path: extend
+  `DebugLogger` to candidate WRAM (sprite stun timers, interaction flags) and
+  observe before designing.
+- **Property-based creature filter.** The blacklist keeps growing (message box
+  `0xB9` counted at the goal tape) and is error-prone (`0x4B` was mislabeled;
+  it is the pipe Lakitu, the rock is `0x48`). SMW copies six per-sprite
+  "tweaker" bytes into WRAM per slot (`$1656/$1662/$166E/$167A/$1686/$190F`)
+  with creature-adjacent bits. `PRP` log lines dump them on every death/mouth
+  entry; once a few sessions exist, evaluate whether a bit predicate separates
+  creatures from objects. A whitelist was rejected (silent undercounting of
+  every unlisted creature).
+- **Checkpoint banking: `$0DD5` false-positive check.** The level-exit event
+  replaced `$1F2E` as the bank signal on 2026-07-31 and the custom-checkpoint
+  entrance was seen live 2026-08-02. Still unchecked: does `$0DD5` shift on
+  sublevel pipe/door transitions? If so a pipe banks early. `BNK` log lines
+  answer it.
+- **Custom checkpoint in a level type that never sets `$1935`.** The one
+  remaining `$1935` gate is `MidwayExitBankDetector.DetectCheckpointEntrance`,
+  kept on purpose to mirror kaizosplits' `CPEntrance` and suppress the
+  entrance-repoint noise during level load (log 2026-08-02: `BNK cp 63->18` at
+  `inLvl=00`). A Yoshi-House-style level with a custom checkpoint would not
+  bank. No live sighting; revisit with a log citation.
+- **Destruction tally live validation.** Kills was validated scenario by
+  scenario 2026-07-16; Destruction shipped on unit tests alone (shared
+  detection paths, low risk). Flip the radio for a session and spot-check
+  poofs, swallows, conversions.
+- **Dragon-coin persistence (Coins).** Some hacks keep dragon coins collected
+  across deaths; there the Coins die-revert is wrong for that portion. Vanilla
+  tracks the in-level count at `$1422`; persistence patches keep a per-level
+  bitfield elsewhere. Log a candidate-WRAM session on a hack known to save
+  them. Edge case; only if it grates in real runs.
+
+## Larger features
+
+- **Advanced kill config.** Expose the creature filter as an editable list
+  behind an advanced settings surface, with a "last N kills" readout (N≈3) so
+  a player can pause, see what just counted, and add it to the exclusion (or
+  inclusion) list. Store lists per ROM hack, keyed by the ROM identity slug the
+  connection already exposes, on top of a shared default list. Design wrinkle:
+  the filter keys on the sprite number byte (`$9E`, one byte), and PIXI-based
+  hacks reuse vanilla numbers there with the custom sprite number at
+  `$7FAB9E`, so the readout must surface the custom number when the custom bit
+  is set or entries are ambiguous. Path decided 2026-07-16: the full "not
+  alive" list is impossible to complete by hand, so grow a best-effort default
+  from play sessions, then ship the list as the escape hatch.
+- **SA-1 hacks.** Blocked upstream: SNES.dll (snes_offsets) declines SA-1
+  cartridges ("SA-1 WRAM discovery is not supported"); whether `$13/$14/$0100`
+  still tick in `$7E` WRAM on SA-1 is an open empirical question there. Once
+  discovery works, this repo needs a second change: the SA-1 pack relocates
+  the sprite tables and widens them from 12 to 22 slots, so `KillCounter`
+  needs an address/slot remap. Biggest audience gap (many modern kaizo hacks
+  are SA-1), but the first step lives in snes_offsets.
+- **User-defined custom counters.** Pick a WRAM address + edge/compare rule +
+  label/icon from Settings. Needs a small rule DSL and UI.
+- **Pending-kill gold rendering for fireball coins.** Show a fireball-converted
+  creature's would-be kill in gold (like unbanked exits), revert if the coin
+  despawns uncollected, settle to white on collect. Needs a "pending kills"
+  count on the counter and partial-value coloring in the renderer.
+- **Save/restore counter values after a Reset/close.** E.g. previous values
+  greyed in Settings with a Recover button. Design open.
+- **Shareable settings code.** A textbox holding a compact code for the whole
+  settings choice, plus a Set button to apply one. Serialize the settings XML
+  to a short string and back.
+- **Overflow wrap/shrink.** When enabled counters exceed the layout width, wrap
+  or shrink. Decided against 2026-07-27 because widths grow mid-run and wrap
+  would change the component height mid-run; current mitigation is a settings
+  hint to stack a second instance. Revisit only after digit-width stability.
 
 ## Known limitations (documented, not bugs)
 
-- **`GetSettingsHashCode` doesn't hash `BankedCounter.saved`.** A bank event
-  that changes `saved` but not `total` doesn't dirty the layout hash, so
-  LiveSplit may not prompt to save and a reload can restore a stale `saved`
-  (spurious gold alert + revert to an older bank). Pre-existing since exit
-  banking; widened by each banked counter. Fix shape: expose a `StateHash`
-  from `BankedCounter` like `KillCounter.StateHash` and fold it in (v0.5.0
-  final review).
+- **Point-blank fireball kills can be missed.** The status transition happens
+  inside one poll gap, so the edge is never sampled. Expected at the 15 ms poll
+  rate; the one Kills miss that is a sampling artifact rather than a rule
+  choice (2026-07-15).
+- **Attract-demo counting.** With the timer running on the title screen, the
+  demo runs real level code. Deaths and Exits have no in-level gate, so the
+  only guard is "count while the timer runs". Closes with the in-level gating
+  under "Count while the timer is stopped".
 
-- ~~**Exit redo inflation.**~~ Fixed 2026-07-31: banking moved off `$1F2E` onto
-  kaizosplits' Level Exit event (`$0DD5`), which fires on every level exit
-  whether or not the save file already owns it. See "Checkpoint banking needs a
-  live confirmation pass" below for what still wants live eyes.
-- **Checkpoint banking needs a live confirmation pass.** 2026-07-31 shipped two
-  new bank signals on unit tests plus the kaizosplits reference: the level-exit
-  event (`$0DD5`, replacing the late `$1F2E`) and the custom-checkpoint entrance
-  (`$1B403`, alongside the vanilla midway flag `$13CE`). Neither has been seen
-  live yet. The open question that motivated `$1B403` — *did the reported "Jumps
-  stayed gold through a midway" mean the midway flag never fired, or did Jumps
-  simply re-arm the alert on the very next jump?* — is now answerable from one
-  session: `DebugLogger` emits `BNK <signal> <old>-><new>` lines for all six
-  banking bytes, and `CTR` lines carry an `[unbanked]` tag. Run a session with
-  Debug log on, hit a checkpoint, and read which signal moved. The `$0DD5`
-  false-positive risk to check at the same time: does it shift on sublevel
-  pipe/door transitions? If it does, a pipe would bank early.
-- **Point-blank fireball kills can be missed (sampling collapse).** When a
-  fireball hits at point-blank range, the sprite's status transition happens
-  inside a single poll gap, so the edge is never sampled and the kill is not
-  counted. Known and expected at the 15 ms poll rate — recorded here because it
-  is the one Kills miss that is a sampling artifact rather than a rule choice
-  (kills/destruction v2 live-smoke, 2026-07-15).
-- **Kills-row radio buttons sit at a fixed x=52 in Settings.** Flagged during
-  the v2 live-smoke as a possible clipping risk at non-100% DPI scaling; never
-  confirmed either way. If a user reports the Kills/Destruction radios
-  overlapping their label, this is the first thing to check.
-- **Destruction tally is not live-validated.** The 2026-07-16 sessions
-  validated the Kills tally scenario-by-scenario; Destruction shipped on unit
-  tests alone (shared detection paths, so risk is low). Flip the radio to
-  Destruction for a session and spot-check poofs/swallows/conversions.
-- **Attract-demo counting.** If the LiveSplit timer is left running on the title
-  screen, the SMW attract demo runs real level code and could count. The primary
-  guard is "only count while the timer runs."
+## Dropped (decided against, kept for context)
 
-## Dropped / parked (decided against, recorded for context)
-
-- **Right-click value readout via `ContextMenuControls`.** A LiveSplit component
-  is GDI-drawn (no hover tooltips on the overlay), so a right-click menu was the
-  only path to an on-overlay "show all values incl. hidden" readout — but it
-  would **shadow LiveSplit's own right-click menu**, so it was dropped. Revisit
-  only if a non-conflicting mechanism appears.
-- **Per-room moon dedupe.** Removed in favor of the single "One per level"
-  checkbox (All vs per-level); per-room was niche.
+- **Three-tier banking (Finish → Exit → Save) with game-over revert.** Dropped
+  2026-09-26; not a feature this component will grow.
+- **Right-click value readout via `ContextMenuControls`.** Would shadow
+  LiveSplit's own right-click menu. Revisit only if a non-conflicting
+  mechanism appears.
+- **Per-room moon dedupe.** Replaced by the single "One per level" checkbox.
+- **Author line low% nudge.** Possibly intrusive; the greyed line stays
+  credit-only.
