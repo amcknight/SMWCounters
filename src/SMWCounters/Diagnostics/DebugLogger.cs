@@ -19,6 +19,8 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 //                                              counting but not on the overlay)
 //   BNK <signal> <old>-><new> | mode=.. inLvl=.. lvl=.. room=.. cp=.. exitMode=..
 //       exits=.. midway=..
+//       signals: midway cp exitMode exits lvl room mode pstate reserve, plus
+//       lvlflags[<lvl>] for the current level's overworld flags byte
 //                                             (a byte the banking logic keys off
 //                                              of changed — answers "did the
 //                                              checkpoint actually fire, and
@@ -92,6 +94,16 @@ internal sealed class DebugLogger
     private readonly PreviousByte[] prevStatus;
     private readonly PreviousByte[] prevSpriteNum;
     private readonly PreviousByte[] prevBankSignal;
+
+    // Per-translevel overworld flags ($1EA2 + level number): beaten / secret
+    // beaten / midway bits. This is the block the game writes to SRAM, so a
+    // change here is the nearest WRAM proxy for "progress the save will keep"
+    // — the candidate bank signal for exits that fire no $0DD5 event (pipe
+    // to map, 2026-09-26 session). Tracked for the current level only.
+    private const int LevelNumber = 0x13BF;
+    private const int LevelFlagsBase = 0x1EA2;
+    private readonly PreviousByte prevLevelFlags = new();
+    private int prevLevelFlagsLevel = -1;
     private readonly Dictionary<string, int> lastValue = new();
     private readonly StatusChangeFilter statusFilter = new();
     private StreamWriter writer;
@@ -155,6 +167,8 @@ internal sealed class DebugLogger
             prevSpriteNum[i].Clear();
         }
         foreach (PreviousByte p in prevBankSignal) { p.Clear(); }
+        prevLevelFlags.Clear();
+        prevLevelFlagsLevel = -1;
     }
 
     // Clear state and release the file (logging disabled / component disposed).
@@ -214,6 +228,30 @@ internal sealed class DebugLogger
             }
             prevBankSignal[i].Set(value);
         }
+        LogLevelFlags(mem);
+    }
+
+    private void LogLevelFlags(ISnesMemory mem)
+    {
+        if (!mem.ReadWramByte(LevelNumber, out byte lvl)
+            || !mem.ReadWramByte(LevelFlagsBase + lvl, out byte flags))
+        {
+            prevLevelFlags.Clear();
+            prevLevelFlagsLevel = -1;
+            return;
+        }
+        if (lvl != prevLevelFlagsLevel)
+        {
+            // Different level: the previous sample belongs to another byte.
+            prevLevelFlags.Clear();
+            prevLevelFlagsLevel = lvl;
+        }
+        if (prevLevelFlags.HasPrevious && prevLevelFlags.Value != flags)
+        {
+            Write($"BNK lvlflags[{lvl:X2}] {prevLevelFlags.Value:X2}->{flags:X2} | "
+                + $"mode={Hex(mem, GameMode)} inLvl={Hex(mem, InLevel)} " + BankContext(mem));
+        }
+        prevLevelFlags.Set(flags);
     }
 
     private static string BankContext(ISnesMemory mem)

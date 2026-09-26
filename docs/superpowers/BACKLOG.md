@@ -11,24 +11,49 @@ struck through. Priorities set 2026-09-26.
   2026-09-26: the hack's intro ends on a "book" orb — Exits collected on the
   finish trigger, no level-exit event fired, and Exits sat gold on the
   overworld until a later death. A jump in the intro stayed gold into the
-  next level. Start+select after a jump leaves it gold on the overworld.
-  Proposed rule, from "banked = the final route's tally": leaving with the
-  exit recorded banks (today); leaving without it (start+select, and any
-  return to the map that doesn't record the exit) discards like a death;
-  the intro finish banks, because that progress is kept — die in the intro
-  and you replay it, finish it and you never see it again. Gates: (1) a
-  decision on start+select, discard vs. keep pending until the next death;
-  (2) one logged session to find the intro's tell and to see what side exits
-  and pipes-to-map write to `$0DD5` and the game mode. The log now emits a
-  `BNK mode` line on every game-mode change with `exitMode`/`lvl` context.
-- **A powerup that goes to the reserve box doesn't count.** Seen 2026-09-26:
-  mushroom while big, flower while fire — both went to the reserve, neither
-  counted. The rule fires only on the `$0071` grow animation. Fix shape: also
-  count a reserve-box (`$0DC2`) fill or upgrade, and suppress the grow that
-  follows dropping the reserve (Select) so drop-and-use isn't counted twice.
-  Open: a mushroom grabbed while big with a full reserve is consumed with no
-  WRAM trace at all; probably accept the miss. Gate: one logged session
-  (`pstate`/`reserve` are now traced).
+  next level. Start+select after a jump leaves it gold on the overworld. A
+  pipe-to-map level left every counter gold, yet the map position and path
+  survived a reset, so the game saved and no bank signal saw it.
+  Rule, from "banked = the final route's tally":
+  - Intro finish banks (decided 2026-09-26): that progress is kept — die in
+    the intro and you replay it, finish it and you never see it again.
+  - Leaving with progress recorded banks. Today only the `$0DD5` exit event
+    and the `$1F2E` backstop count as "recorded"; the pipe-to-map case says
+    that set is incomplete. Candidate: the current level's overworld flags
+    byte (`$1EA2 + level`, beaten/secret/midway bits) — the block the save
+    routine copies to SRAM, so the nearest WRAM proxy for "the save will keep
+    this". A save itself leaves no WRAM trace, and autosave patches add none.
+  - Leaving without progress recorded reverts like a death. Decided for orbs
+    and goals 2026-09-26: keeping the collect pending would double count when
+    the goal is redone. Start+select is the same case.
+  Gates: one logged session (below). Also check whether the pipe's exit
+  event landed at a game mode below `0x0C` and was swallowed by the play
+  gate; the `BNK mode` and `BNK lvlflags` lines answer both questions.
+- **Powerup counting v2: count level pickups, not reserve-box juggling.**
+  2026-09-26 observations: a mushroom or flower grabbed while already
+  powered goes to the reserve and does not count (correct: not used yet); a
+  feather grabbed as Fire counts and sends the flower to the box (correct:
+  a new pickup); but dropping that flower and taking it back, then again,
+  would count every swap, because the rule fires on the `$0071` transform
+  animation. Model: count when the body state changes from a *level* powerup
+  sprite; a change sourced from the reserve box (Select drop, then pickup)
+  is inventory-neutral and never counts. Open: a pickup that overwrites a
+  full box, and a feather-flower juggle where the displaced item may or may
+  not return to the box. Gate: one logged session with `pstate`/`reserve`
+  transitions during a juggle, to find the drop signature.
+- **Rip Van Fish not counted when killed by a shell or a cape spin.** Seen
+  2026-09-26. Both should reach the dead set (status `02`). Suspects: a
+  custom sprite reusing a number on the `NotAlive` list or in the koopa
+  range, or a despawn path that skips the dead set. Gate: the `SPR` trace
+  for one fish kill.
+- **The one logged session that feeds the three entries above.** Debug log
+  on, then: finish the intro; start+select out of a level after a jump; the
+  pipe-to-map level; a side exit if the hack has one; a mushroom while big; a
+  flower while fire; a feather while fire, then Select-drop and retake the
+  flower twice; a midway while small; a Rip Van Fish killed by a shell and by
+  a cape spin. Read `BNK mode`/`BNK lvlflags`/`BNK exitMode` around each
+  leave, `BNK pstate`/`BNK reserve` around each pickup, and `SPR` for the
+  fish.
 - **Screenshot.** The README still carries a TODO for a picture of the
   component in a LiveSplit layout.
 - **Live smoke still owed:** the play gate (a title-screen demo death and a
