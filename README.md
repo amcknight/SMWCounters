@@ -1,8 +1,10 @@
 # LiveSplit SMW Counters
 
 A [LiveSplit](https://livesplit.org/) layout component that shows live *Super
-Mario World* counters — **deaths**, **level exits**, **jumps**, **3-up
-moons**, and **powerups** — by reading SNES WRAM from your running emulator.
+Mario World* counters — **deaths**, **level exits**, **3-up moons**,
+**jumps**, **powerups**, **coins**, and **kills** — by reading SNES WRAM from
+your running emulator. Built for challenge runs (low%, low-jump, pacifist,
+deathless) on vanilla SMW and ROM hacks.
 
 <!-- TODO: add a screenshot of the component in a LiveSplit layout. -->
 
@@ -17,6 +19,9 @@ moons**, and **powerups** — by reading SNES WRAM from your running emulator.
    SMW Counters**.
 4. Save the layout.
 
+Upgrading: replace both DLLs. An older `SNES.dll` next to a newer
+`SMWCounters.dll` will not load.
+
 ## Requirements
 
 - **LiveSplit** 1.8.37 or newer.
@@ -26,35 +31,74 @@ moons**, and **powerups** — by reading SNES WRAM from your running emulator.
   [snes_offsets](https://github.com/amcknight/snes_offsets) project's
   `SNES.dll`), so there are no per-build offset tables to go stale and no
   configuration.
-- A tiny **status pixel** in the component's top-left corner shows connection
-  health at a glance: green = connected to the game (pale green = connected,
-  identity unvouched), blue = discovering, gray = searching (dim = no game
-  running), orange = retrying shortly, yellow = connected with rival
-  candidates (normal on RetroArch), red = no emulator found. Toggle it off in
-  Configuration if you don't want it.
+- **SA-1 hacks are not supported yet.** `SNES.dll` declines SA-1 cartridges;
+  the component shows the reason in its settings status line.
 
-## Configuration
+## The counters
+
+Each counter can be shown or hidden independently. Every counter tallies for
+the whole run whether or not it is shown, so switching one on mid-run reveals
+what it has been counting rather than starting from zero.
+
+| Counter | Counts | Default |
+|---|---|---|
+| **Deaths** | Each time Mario dies. | shown |
+| **Exits** | Each level exit (goal tape, orb, key, boss). Switch palaces don't count: they end without a finish event. | shown |
+| **Moons** | 3-up moons collected. | hidden |
+| **Jumps** | Player-initiated jumps. Running off a ledge, enemy bounces, and mid-air presses do not count; jumping off Yoshi or out of water does. | hidden |
+| **Powerups** | Mushroom, feather, and flower pickups (the grow animation). | hidden |
+| **Coins** | Coins collected in levels, as a lifetime tally across 100-coin wraps. Shop deductions and off-level coin writes are ignored. | hidden |
+| **Kills** | Creatures killed: stomps, spin jumps, shell hits, fireballs, Yoshi eats, lava, goal-tape coins. Objects (throw blocks, springboards, P-switches, message boxes, …) are excluded. A **Destruction** mode counts everything destroyed instead, objects included. | hidden |
+
+### Discard on death
+
+Moons, Jumps, Powerups, Coins, and Kills are **banked** counters. Collects
+since the last checkpoint or exit show in the layout's gold (best-segment)
+color; reaching a midway or finishing the level banks them; dying first
+discards them. This is what a low% run means by "it only counts if you keep
+it".
+
+Each banked counter has a **Discard on death** checkbox in settings. Both
+histories (with and without discards) are always tracked; the checkbox only
+picks which one is shown, so flipping it mid-run is safe. It defaults on for
+everything except Moons.
+
+### What counts, and when
+
+- Counters only count while the LiveSplit timer is running (or paused, or
+  after the final split) unless **Count while the timer is stopped** is on.
+  That setting is for challenge runs that never start a timer.
+- Deaths and exits count only once you are past the title and file-select
+  screens, so the title-screen attract demo never counts. Collects count only
+  inside a level.
+- Counter values are saved with the layout, so they survive closing LiveSplit.
+
+## Settings
 
 Open the component's settings (Edit Layout → double-click **SMW Counters**):
 
-- **Enable/disable** each counter independently (deaths and exits are on by
-  default; jumps, moons, and powerups are off by default). Disabling a counter
-  only hides it — every counter tallies for the whole run, so switching one on
-  mid-run shows what it has been counting rather than starting from zero. Use
-  its **Reset** button if you want it to start over.
-- **3-up moon dedupe mode** — count **All** moons, or de-duplicate **Per level**
-  or **Per room**.
-- **Powerups** — a low% helper: counts powerups collected, and turns the
-  layout's negative color while you're carrying powerups that haven't been
-  "banked" yet by a checkpoint or exit. Die before banking to discard them
-  without counting. Off by default.
-- **Label overrides** — replace a counter's default sprite icon with your own
-  text label.
-- **Reset key** — a hotkey (keyboard or gamepad) that zeroes the counters.
-- **Reset on splits reset** — clear counters whenever the run resets.
-- **Show connection status pixel** — toggle the top-left status pixel on/off.
-  On by default.
-- **Alignment** and **row height** for layout fit.
+- **Per counter:** show/hide, the current value (editable), a **Reset**
+  button, and the **Discard on death** checkbox. Kills has a **Kills /
+  Destruction** selector.
+- **Reset hotkey** — a global keyboard or gamepad key that zeroes every
+  counter.
+- **Reset counter values when splits reset** — on by default.
+- **Count while the timer is stopped** — off by default; see above.
+- **Show connection status pixel** — a tiny square in the component's
+  top-left corner. Green or blue = reading the game (green is the normal
+  steady state on RetroArch). Purple = emulator paused. Yellow = looking for
+  the game. Orange = emulator found, no game loaded. Gray = waiting before
+  retrying. Red = no emulator found.
+- **Debug log** — writes counter, banking, and sprite events to
+  `%LocalAppData%\SMWCounters\counters-debug.log`. Off by default; turn it on
+  when reporting a miscount so the event trail can be read.
+- **Row height**, **Alignment**, and **Reserve digits** for layout fit.
+  Reserve digits (default 3) is how many digits every value keeps room for,
+  so counters don't shift when a value rolls from 9 to 10.
+
+If you enable more counters than fit on one row, add a second SMW Counters
+component to the layout and split the counters between them. The component
+never wraps, so its height stays fixed mid-run.
 
 ## Build from source
 
@@ -63,9 +107,14 @@ Open the component's settings (Edit Layout → double-click **SMW Counters**):
 ```sh
 pwsh -File scripts/fetch-livesplit-core.ps1   # fetches lib/LiveSplit.Core.dll
 dotnet build src/SMWCounters/SMWCounters.csproj -c Release
+dotnet test test/SMWCounters.Tests/SMWCounters.Tests.csproj -c Release
 ```
 
-The built DLL lands under `artifacts/bin/SMWCounters/`.
+The built DLL lands under `artifacts/bin/SMWCounters/`. To have every build
+copy it (with `SNES.dll`) straight into your LiveSplit `Components` folder,
+set `ComponentsPath` in a gitignored `SMWCounters.local.props` next to the
+csproj, or pass `-p:ComponentsPath=...`. Close LiveSplit first; it locks the
+DLLs.
 
 **Inside the LiveSplit super-repo:** provide `LsSrcPath` (pointing at the
 LiveSplit `src` folder) and the project references `LiveSplit.Core` by source

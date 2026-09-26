@@ -10,35 +10,19 @@ The last public tag is v0.2.0 (2026-07-03). Coins, Kills/Destruction, the
 SNES.dll structural WRAM discovery, banked histories, and the discard-on-death
 column have all landed since and never shipped.
 
-- **README refresh.** Describe the current counter set (Deaths, Exits, Coins,
-  Jumps, Moons, Powerups, Kills/Destruction), the discard-on-death column, the
-  status pixel colors as they are now, and the debug log. Drop the "Per room"
-  moon mode (removed). Add the layout screenshot the README has a TODO for.
-- **Version bump + tag.** The csproj says 0.5.0; nothing past v0.2.0 was ever
-  tagged. Bump, tag `vX.Y.Z`, and the release workflow stages the
+- **Screenshot.** The README still carries a TODO for a picture of the
+  component in a LiveSplit layout.
+- **Tag v0.6.0.** The csproj is bumped to 0.6.0 and the README matches the
+  code. Pushing the tag runs the release workflow, which stages the
   `SMWCounters.dll` + `SNES.dll` zip.
+- **Live smoke of the 0.6.0 changes.** Three behaviors shipped on unit tests
+  alone and want one session with the debug log on: the digit-width reserve
+  (watch a 9→10 rollover not shift the row), the play gate (a title-screen
+  demo death and a file load must not count or bank), and "Count while the
+  timer is stopped" with the timer never started.
 
 ## Easy wins (no live session needed)
 
-- **Digit-width stability.** Each value's cell is measured from its actual
-  string every frame, so every digit rollover shifts everything to its right.
-  Reserve a minimum value width (widest digit glyph × N, one global setting,
-  default 3), left-align the value inside it, and let the cell grow only once
-  the value exceeds N digits. Prerequisite for the wrap idea under "Larger
-  features".
-- **Count while the timer is stopped.** Opt-in setting. Today NotRunning
-  flushes edge state and counts nothing, so demos and casual play cannot
-  pollute a run. Deaths and Exits are the only counters with no in-level gate
-  (Kills, Jumps, Powerups, Moons, Coins already require game mode `0x14`), so
-  the feature is two pieces: give the death and exit edges their own in-level
-  gate (mechanism to be chosen; `0x14` is the candidate, not the decision), then
-  add the flag. Reset still zeroes; banked counters bank/revert as normal; the
-  Ended-phase freeze is unaffected. Once gated, the attract-demo limitation
-  below closes.
-- **Coin tests: pin the `MaxWrapBurst` boundary and same-poll orderings.**
-  Nothing asserts wrap candidate == 15 (counted) vs 16 (resync), death+collect
-  in one poll, or collect+bank in one poll. Cheap facts that lock
-  `BankedCounter.Poll` ordering semantics.
 - **Kills-row radio buttons sit at a fixed x offset in Settings.** Possible
   clipping at non-100% DPI; never confirmed. Check once at 125%/150%.
 - **Settings dialog is fixed-size.** Widen or make resizable if it ever feels
@@ -163,10 +147,11 @@ Research-gated: run a session with the debug log on, then design.
   inside one poll gap, so the edge is never sampled. Expected at the 15 ms poll
   rate; the one Kills miss that is a sampling artifact rather than a rule
   choice (2026-07-15).
-- **Attract-demo counting.** With the timer running on the title screen, the
-  demo runs real level code. Deaths and Exits have no in-level gate, so the
-  only guard is "count while the timer runs". Closes with the in-level gating
-  under "Count while the timer is stopped".
+- **The play gate opens at game mode `0x0C`, not at level-main.** Deaths and
+  exits count from "fade to overworld" onward because the exit-flag edge
+  lands at `0x0C` (log 2026-08-04) and the `$1F2E` backstop moves on the
+  overworld. A hack whose title screen runs in a mode at or past `0x0C` would
+  slip through; none seen.
 
 ## Dropped (decided against, kept for context)
 
