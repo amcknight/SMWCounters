@@ -18,8 +18,13 @@ column have all landed since and never shipped.
 - **Live smoke of the 0.6.0 changes.** Three behaviors shipped on unit tests
   alone and want one session with the debug log on: the digit-width reserve
   (watch a 9→10 rollover not shift the row), the play gate (a title-screen
-  demo death and a file load must not count or bank), and "Count while the
-  timer is stopped" with the timer never started.
+  demo death and a file load must not count or bank), and "Only count when
+  timer running" unticked with the timer never started.
+- **Row spacing iteration.** The 2026-09-26 review found the row too spread
+  out; the cell gap went 14→10px, icon-to-number 4→2px, the reserve floor
+  3→2 with per-value growth by digit count. Needs another look in a real
+  layout; seven counters at row height 45 still won't fit a default-width
+  LiveSplit window, which is what the two-component hint is for.
 
 ## Easy wins (no live session needed)
 

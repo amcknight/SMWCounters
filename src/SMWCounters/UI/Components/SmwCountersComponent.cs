@@ -16,7 +16,11 @@ namespace LiveSplit.UI.Components;
 
 public class SmwCountersComponent : IComponent
 {
-    private const float CellGap = 14f;
+    // Gap between one counter's value and the next counter's icon, and the
+    // gap between an icon and its value. Tuned by eye (2026-09-26 review:
+    // "too spread out"; numbers 1-3px closer to the icons).
+    private const float CellGap = 10f;
+    private const float LabelValueGap = 2f;
 
     private readonly LiveSplitState state;
     private readonly Timer pollTimer;
@@ -49,8 +53,7 @@ public class SmwCountersComponent : IComponent
     // sharing cached brushes across labels is safe.
     private Font rowFont;
     private Font reserveFont;
-    private int reserveDigits;
-    private float reserveWidth;
+    private readonly Dictionary<int, float> reserveWidths = new();
     private readonly Dictionary<int, SolidBrush> brushCache = new();
     private readonly System.Windows.Forms.ToolTip extrasToolTip = new();
 
@@ -200,15 +203,15 @@ public class SmwCountersComponent : IComponent
         // the split reveals the true totals the way the timer jumps to where
         // it would have been.
         //
-        // CountWhileTimerStopped lifts the NotRunning gate for runs that never
-        // start the timer. The title-screen attract demo is still excluded:
-        // every counter has an in-play game-mode gate of its own (PlayGate for
-        // deaths/exits, level-main for the collects), so the timer was never
-        // the only guard.
+        // Unticking "Only count when timer running" lifts the NotRunning gate
+        // for runs that never start the timer. The title-screen attract demo
+        // is still excluded: every counter has an in-play game-mode gate of
+        // its own (PlayGate for deaths/exits, level-main for the collects), so
+        // the timer was never the only guard.
         bool timerActive = state.CurrentPhase == TimerPhase.Running
             || state.CurrentPhase == TimerPhase.Paused
             || state.CurrentPhase == TimerPhase.Ended;
-        bool counting = timerActive || Settings.CountWhileTimerStopped;
+        bool counting = timerActive || !Settings.OnlyCountWhileTimerRunning;
 
         // Before this tick's polling, so the capture on the transition into
         // Ended sees the values as of the split.
@@ -330,10 +333,11 @@ public class SmwCountersComponent : IComponent
 
         // Measure each enabled counter's cell width: label-slot + " " + value.
         // Label slot is icon-aspect-scaled when the counter has an icon, else default-label text width.
-        // The value slot reserves room for Settings.ReserveDigits digits so a
-        // rollover inside the reserve does not shift the counters to its right.
+        // The value slot is sized by digit count, not by the value's own
+        // measured width: the widest run of max(Settings.ReserveDigits, digits
+        // in the value). So proportional fonts don't jitter as digits change
+        // within a decade, and the cell grows once per decade past the floor.
         var enabled = counters.Where(c => Settings.IsEnabled(c.Id)).ToList();
-        float reserve = ReserveWidthFor(g, font, Settings.ReserveDigits);
         float totalWidth = 0f;
         var cellWidths = new Dictionary<string, (float labelW, float valueW)>();
         foreach (ISmwCounter c in enabled)
@@ -341,11 +345,13 @@ public class SmwCountersComponent : IComponent
             float labelW = c.DefaultIcon != null
                 ? IconWidthFor(c.DefaultIcon, iconHeight)
                 : g.MeasureString(c.DefaultLabel, font).Width;
-            float measuredW = g.MeasureString(endedFreeze.ValueFor(c).ToString("0"), font).Width;
-            float valueW = ValueWidth.Cell(measuredW, reserve);
+            string valueText = endedFreeze.ValueFor(c).ToString("0");
+            float measuredW = g.MeasureString(valueText, font).Width;
+            int digits = ValueWidth.DigitsFor(endedFreeze.ValueFor(c), Settings.ReserveDigits);
+            float valueW = ValueWidth.Cell(measuredW, ReserveWidthFor(g, font, digits));
             cellWidths[c.Id] = (labelW, valueW);
             if (totalWidth > 0) { totalWidth += CellGap; }
-            totalWidth += labelW + 4 + valueW;
+            totalWidth += labelW + LabelValueGap + valueW;
         }
 
         HorizontalWidth = totalWidth + 15;
@@ -383,7 +389,7 @@ public class SmwCountersComponent : IComponent
                 ConfigureLabel(labelCells[c.Id], font, textColor, StringAlignment.Near, x, labelW, height);
                 labelCells[c.Id].Draw(g);
             }
-            x += labelW + 4;
+            x += labelW + LabelValueGap;
 
             Color valueColor = endedFreeze.AlertFor(c) ? state.LayoutSettings.BestSegmentColor : textColor;
             ConfigureLabel(valueCells[c.Id], font, valueColor, StringAlignment.Near, x, valueW, height);
@@ -392,17 +398,22 @@ public class SmwCountersComponent : IComponent
         }
     }
 
-    // The reserve depends only on the row font and the digit setting; both
-    // change rarely, so measure ten digit runs once per change, not per frame.
+    // Widest N-digit run for the row font, memoized per digit count; the
+    // cache empties when the row font is rebuilt. Ten measurements per new
+    // digit count, none per frame.
     private float ReserveWidthFor(Graphics g, Font font, int digits)
     {
-        if (!ReferenceEquals(reserveFont, font) || reserveDigits != digits)
+        if (!ReferenceEquals(reserveFont, font))
         {
             reserveFont = font;
-            reserveDigits = digits;
-            reserveWidth = ValueWidth.Reserve(s => g.MeasureString(s, font).Width, digits);
+            reserveWidths.Clear();
         }
-        return reserveWidth;
+        if (!reserveWidths.TryGetValue(digits, out float w))
+        {
+            w = ValueWidth.Reserve(s => g.MeasureString(s, font).Width, digits);
+            reserveWidths[digits] = w;
+        }
+        return w;
     }
 
     private Font GetRowFont(Font layoutFont)

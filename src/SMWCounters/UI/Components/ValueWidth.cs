@@ -11,10 +11,16 @@ internal static class ValueWidth
 {
     public const int MinDigits = 1;
     public const int MaxDigits = 6;
-    public const int DefaultDigits = 3;
+    public const int DefaultDigits = 2;
 
     public static int ClampDigits(int digits)
         => Math.Max(MinDigits, Math.Min(MaxDigits, digits));
+
+    // Digits the cell is sized for: the floor, or the value's own digit count
+    // once it outgrows the floor. Deaths at 1234 get four digits' room while
+    // Exits at 12 sit at the floor, and neither jitters within its decade.
+    public static int DigitsFor(int value, int floorDigits)
+        => Math.Max(ClampDigits(floorDigits), value.ToString("0").Length);
 
     // Widest run of `digits` identical digits under `measure`. Digits are not
     // all the same width in proportional fonts ('1' is usually narrow), so the

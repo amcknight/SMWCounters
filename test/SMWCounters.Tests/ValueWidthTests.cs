@@ -41,6 +41,17 @@ public class ValueWidthTests
     }
 
     [Fact]
+    public void DigitsFor_FloorUntilTheValueOutgrowsIt()
+    {
+        Assert.Equal(2, ValueWidth.DigitsFor(0, 2));
+        Assert.Equal(2, ValueWidth.DigitsFor(7, 2));
+        Assert.Equal(2, ValueWidth.DigitsFor(99, 2));
+        Assert.Equal(3, ValueWidth.DigitsFor(100, 2));
+        Assert.Equal(4, ValueWidth.DigitsFor(1234, 2));
+        Assert.Equal(3, ValueWidth.DigitsFor(5, 3));
+    }
+
+    [Fact]
     public void ClampDigits_BoundsAndDefault()
     {
         Assert.Equal(ValueWidth.MinDigits, ValueWidth.ClampDigits(-4));

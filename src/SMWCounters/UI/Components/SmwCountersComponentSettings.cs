@@ -34,10 +34,14 @@ public class SmwCountersComponentSettings : UserControl
     public HAlignment Alignment { get; set; } = HAlignment.Center;
     // Digits every value cell reserves room for before it starts widening.
     public int ReserveDigits { get; set; } = ValueWidth.DefaultDigits;
-    // Keep polling and counting while the LiveSplit timer is not running
-    // (challenge runs that never start the timer). Off: counters only tally
-    // during a live run.
-    public bool CountWhileTimerStopped { get; set; } = false;
+    // On (default): counters only tally during a live run. Off: they keep
+    // counting with the timer stopped, for challenge runs that never start it.
+    public bool OnlyCountWhileTimerRunning { get; set; } = true;
+
+    // Content width. LiveSplit hosts this control in a fixed-height dialog
+    // whose vertical scrollbar eats ~17px of client width, so anything wider
+    // than the host minus that bar sprouts a horizontal scrollbar too.
+    private const int DialogWidth = 460;
     public bool ResetOnSplitsReset { get; set; } = true;
     public bool DebugLog { get; set; } = false;
     public bool ShowStatusDot { get; set; } = true;
@@ -57,7 +61,7 @@ public class SmwCountersComponentSettings : UserControl
     private RadioButton rdoCenter;
     private RadioButton rdoRight;
     private CheckBox chkResetOnSplitsReset;
-    private CheckBox chkCountWhileTimerStopped;
+    private CheckBox chkOnlyCountWhileTimerRunning;
     private CheckBox chkShowStatusDot;
     private CheckBox chkDebugLog;
     private Label lblManyCounters;
@@ -262,7 +266,7 @@ public class SmwCountersComponentSettings : UserControl
 
         chkResetOnSplitsReset = new CheckBox
         {
-            Text = "Reset counter values when splits reset",
+            Text = "Reset counters when splits reset",
             Location = new Point(10, y),
             AutoSize = true,
             Checked = ResetOnSplitsReset,
@@ -271,15 +275,15 @@ public class SmwCountersComponentSettings : UserControl
         Controls.Add(chkResetOnSplitsReset);
         y += 28;
 
-        chkCountWhileTimerStopped = new CheckBox
+        chkOnlyCountWhileTimerRunning = new CheckBox
         {
-            Text = "Count while the timer is stopped (runs without a timer)",
+            Text = "Only count when timer running",
             Location = new Point(10, y),
             AutoSize = true,
-            Checked = CountWhileTimerStopped,
+            Checked = OnlyCountWhileTimerRunning,
         };
-        chkCountWhileTimerStopped.CheckedChanged += (_, __) => CountWhileTimerStopped = chkCountWhileTimerStopped.Checked;
-        Controls.Add(chkCountWhileTimerStopped);
+        chkOnlyCountWhileTimerRunning.CheckedChanged += (_, __) => OnlyCountWhileTimerRunning = chkOnlyCountWhileTimerRunning.Checked;
+        Controls.Add(chkOnlyCountWhileTimerRunning);
         y += 28;
 
         chkShowStatusDot = new CheckBox
@@ -295,7 +299,7 @@ public class SmwCountersComponentSettings : UserControl
 
         chkDebugLog = new CheckBox
         {
-            Text = "Debug: log counter + sprite events to file",
+            Text = "Write debug events to counters-debug.log",
             Location = new Point(10, y),
             AutoSize = true,
             Checked = DebugLog,
@@ -308,7 +312,7 @@ public class SmwCountersComponentSettings : UserControl
         {
             Text = "Tip: if counters cut off, add a second SMW Counters component to the layout and split the counters between them.",
             Location = new Point(10, y),
-            MaximumSize = new Size(440, 0),
+            MaximumSize = new Size(DialogWidth - 20, 0),
             AutoSize = true,
             ForeColor = SystemColors.GrayText,
         };
@@ -342,10 +346,10 @@ public class SmwCountersComponentSettings : UserControl
             catch { }
         };
         Controls.Add(author);
-        author.Location = new Point(480 - author.PreferredWidth - 10, y);
+        author.Location = new Point(DialogWidth - author.PreferredWidth - 10, y);
         y += 20;
 
-        Size = new Size(480, y + 10);
+        Size = new Size(DialogWidth, y + 10);
 
         RegisterHotKeys();
     }
@@ -396,7 +400,7 @@ public class SmwCountersComponentSettings : UserControl
             rdoRight.Checked = Alignment == HAlignment.Right;
         }
         if (chkResetOnSplitsReset != null) { chkResetOnSplitsReset.Checked = ResetOnSplitsReset; }
-        if (chkCountWhileTimerStopped != null) { chkCountWhileTimerStopped.Checked = CountWhileTimerStopped; }
+        if (chkOnlyCountWhileTimerRunning != null) { chkOnlyCountWhileTimerRunning.Checked = OnlyCountWhileTimerRunning; }
         if (chkShowStatusDot != null) { chkShowStatusDot.Checked = ShowStatusDot; }
         if (chkDebugLog != null) { chkDebugLog.Checked = DebugLog; }
         RegisterHotKeys();
@@ -538,7 +542,7 @@ public class SmwCountersComponentSettings : UserControl
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
         ReserveDigits = ValueWidth.ClampDigits(SettingsHelper.ParseInt(e["ReserveDigits"], ValueWidth.DefaultDigits));
         ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], true);
-        CountWhileTimerStopped = SettingsHelper.ParseBool(e["CountWhileTimerStopped"], false);
+        OnlyCountWhileTimerRunning = SettingsHelper.ParseBool(e["OnlyCountWhileTimerRunning"], true);
         DebugLog = SettingsHelper.ParseBool(e["DebugLog"], false);
         ShowStatusDot = SettingsHelper.ParseBool(e["ShowStatusDot"], true);
 
@@ -592,7 +596,7 @@ public class SmwCountersComponentSettings : UserControl
         hash ^= SettingsHelper.CreateSetting(document, parent, "Alignment", Alignment.ToString());
         hash ^= SettingsHelper.CreateSetting(document, parent, "ReserveDigits", ReserveDigits);
         hash ^= SettingsHelper.CreateSetting(document, parent, "ResetOnSplitsReset", ResetOnSplitsReset);
-        hash ^= SettingsHelper.CreateSetting(document, parent, "CountWhileTimerStopped", CountWhileTimerStopped);
+        hash ^= SettingsHelper.CreateSetting(document, parent, "OnlyCountWhileTimerRunning", OnlyCountWhileTimerRunning);
         hash ^= SettingsHelper.CreateSetting(document, parent, "DebugLog", DebugLog);
         hash ^= SettingsHelper.CreateSetting(document, parent, "ShowStatusDot", ShowStatusDot);
 

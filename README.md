@@ -43,7 +43,7 @@ what it has been counting rather than starting from zero.
 | Counter | Counts | Default |
 |---|---|---|
 | **Deaths** | Each time Mario dies. | shown |
-| **Exits** | Each level exit (goal tape, orb, key, boss). Switch palaces don't count: they end without a finish event. | shown |
+| **Exits** | Each level exit (goal tape, orb, key, boss). | shown |
 | **Moons** | 3-up moons collected. | hidden |
 | **Jumps** | Player-initiated jumps. Running off a ledge, enemy bounces, and mid-air presses do not count; jumping off Yoshi or out of water does. | hidden |
 | **Powerups** | Mushroom, feather, and flower pickups (the grow animation). | hidden |
@@ -66,8 +66,8 @@ everything except Moons.
 ### What counts, and when
 
 - Counters only count while the LiveSplit timer is running (or paused, or
-  after the final split) unless **Count while the timer is stopped** is on.
-  That setting is for challenge runs that never start a timer.
+  after the final split). Untick **Only count when timer running** for
+  challenge runs that never start a timer.
 - Deaths and exits count only once you are past the title and file-select
   screens, so the title-screen attract demo never counts. Collects count only
   inside a level.
@@ -82,19 +82,20 @@ Open the component's settings (Edit Layout → double-click **SMW Counters**):
   Destruction** selector.
 - **Reset hotkey** — a global keyboard or gamepad key that zeroes every
   counter.
-- **Reset counter values when splits reset** — on by default.
-- **Count while the timer is stopped** — off by default; see above.
+- **Reset counters when splits reset** — on by default.
+- **Only count when timer running** — on by default; see above.
 - **Show connection status pixel** — a tiny square in the component's
   top-left corner. Green or blue = reading the game (green is the normal
   steady state on RetroArch). Purple = emulator paused. Yellow = looking for
   the game. Orange = emulator found, no game loaded. Gray = waiting before
   retrying. Red = no emulator found.
-- **Debug log** — writes counter, banking, and sprite events to
-  `%LocalAppData%\SMWCounters\counters-debug.log`. Off by default; turn it on
-  when reporting a miscount so the event trail can be read.
+- **Write debug events to counters-debug.log** — the file lives in
+  `%LocalAppData%\SMWCounters\`. Off by default; turn it on when reporting a
+  miscount so the event trail can be read.
 - **Row height**, **Alignment**, and **Reserve digits** for layout fit.
-  Reserve digits (default 3) is how many digits every value keeps room for,
-  so counters don't shift when a value rolls from 9 to 10.
+  Reserve digits (default 2) is the minimum number of digits every value
+  keeps room for. A value's cell only grows once it outgrows that, so
+  counters don't shift as digits change.
 
 If you enable more counters than fit on one row, add a second SMW Counters
 component to the layout and split the counters between them. The component
