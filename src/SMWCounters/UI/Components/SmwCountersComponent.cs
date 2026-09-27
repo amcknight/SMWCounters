@@ -285,7 +285,7 @@ public class SmwCountersComponent : IComponent
         {
             debugLog.Poll(connection, counters, id => Settings.IsEnabled(id),
                           state.CurrentPhase.ToString(), connection.Describe());
-            Settings.SetStatus(countingLabel + " · " + connection.Describe() + " · debug log → " + debugLog.LogPath);
+            Settings.SetStatus(countingLabel + " · " + connection.Describe() + " · logging to counters-debug.log");
         }
         else
         {

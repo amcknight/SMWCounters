@@ -29,6 +29,12 @@ struck through. Priorities set 2026-09-26.
   Gates: one logged session (below). Also check whether the pipe's exit
   event landed at a game mode below `0x0C` and was swallowed by the play
   gate; the `BNK mode` and `BNK lvlflags` lines answer both questions.
+  Hack-dependence, found 2026-09-26: this hack saves on every overworld
+  move (a common autosave patch), so "back on the map alive" is progress
+  kept here, while vanilla and unpatched hacks save only at the save prompt.
+  The rule must hold on both; a save itself is invisible from WRAM, so if
+  the flags byte doesn't move for the pipe case the fallback is a per-hack
+  "autosaves on the map" setting.
 - **Powerup counting v2: count level pickups, not reserve-box juggling.**
   2026-09-26 observations: a mushroom or flower grabbed while already
   powered goes to the reserve and does not count (correct: not used yet); a
@@ -37,10 +43,14 @@ struck through. Priorities set 2026-09-26.
   would count every swap, because the rule fires on the `$0071` transform
   animation. Model: count when the body state changes from a *level* powerup
   sprite; a change sourced from the reserve box (Select drop, then pickup)
-  is inventory-neutral and never counts. Open: a pickup that overwrites a
-  full box, and a feather-flower juggle where the displaced item may or may
-  not return to the box. Gate: one logged session with `pstate`/`reserve`
-  transitions during a juggle, to find the drop signature.
+  is inventory-neutral and never counts. Leanings 2026-09-26: a pickup that
+  overwrites a full box does not count; a mushroom taken while big with a
+  mushroom already boxed (nothing happens) does not count; the orb glitch
+  counts. Check hacks with custom box items (JUMP's brown block). Juggles
+  are the edge-case mine; "every grab counts" is the simple fallback but
+  the current feel is preferred. Gate: one logged session with
+  `pstate`/`reserve` transitions during a juggle, to find the drop
+  signature.
 - **Rip Van Fish not counted when killed by a shell or a cape spin.** Seen
   2026-09-26. Both should reach the dead set (status `02`). Suspects: a
   custom sprite reusing a number on the `NotAlive` list or in the koopa

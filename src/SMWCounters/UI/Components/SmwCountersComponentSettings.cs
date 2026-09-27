@@ -310,15 +310,18 @@ public class SmwCountersComponentSettings : UserControl
         SyncManyCountersHint();
         y += 34;
 
+        // Wraps within the dialog (two lines reserved) so a long connection
+        // description can't push the content wider than the host.
         lblStatus = new Label
         {
             Text = "(not polled yet)",
             Location = new Point(10, y),
+            MaximumSize = new Size(DialogWidth - 20, 0),
             AutoSize = true,
             ForeColor = System.Drawing.SystemColors.GrayText,
         };
         Controls.Add(lblStatus);
-        y += 24;
+        y += 40;
 
         var author = new LinkLabel
         {
