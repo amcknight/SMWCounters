@@ -54,9 +54,15 @@ what it has been counting rather than starting from zero.
 
 Moons, Jumps, Powerups, Coins, and Kills are **banked** counters. Collects
 since the last checkpoint or exit show in the layout's gold (best-segment)
-color; reaching a midway or finishing the level banks them; dying first
-discards them. This is what a low% run means by "it only counts if you keep
-it".
+color; reaching a midway, finishing the level, or leaving it any other way
+(start+select, a side exit, a pipe back to the map) banks them; dying first
+discards them. Death is the only thing that discards. This is what a low%
+run means by "it only counts if you keep it".
+
+Exits are the one counter with an extra rule: a goal, orb, key, or boss
+finish counts only once the level actually exits. Leave without that and
+the finish is dropped, so re-doing it can't count twice. The intro level's
+finish counts even though it never "exits".
 
 Each banked counter has a **Discard on death** checkbox in settings. Both
 histories (with and without discards) are always tracked; the checkbox only

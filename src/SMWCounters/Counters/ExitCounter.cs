@@ -58,15 +58,16 @@ internal sealed class ExitCounter : BankedCounter
         return goal || orb || key || boss ? 1 : 0;
     }
 
-    // Bank on the exit event, or on a kept leave (the intro finish fires no
-    // event); an orb/goal collected then abandoned (side exit, start+select)
-    // is discarded, since re-doing it would otherwise count twice.
+    // Bank on the exit event, or on the intro finish (which fires no event
+    // yet can never be replayed). Any other return to the map with a finish
+    // collected but no exit event is an abandoned finish: discard it, since
+    // re-doing it would otherwise count twice.
     protected override bool DetectBank(ISnesMemory memory)
     {
         bool banked = levelExit.DetectExit(memory);
         LevelLeave verdict = leave.Detect(memory);
-        leaveDiscarded = verdict == LevelLeave.NotKept;
-        return banked || verdict == LevelLeave.Kept;
+        leaveDiscarded = verdict == LevelLeave.Other && !banked;
+        return banked || verdict == LevelLeave.Intro;
     }
 
     protected override bool DetectDiscard(ISnesMemory memory) => leaveDiscarded;

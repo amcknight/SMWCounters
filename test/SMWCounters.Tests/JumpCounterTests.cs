@@ -143,13 +143,18 @@ public class JumpCounterTests
         Assert.True(c.ValueIsAlert);   // first re-sample only re-baselines
     }
 
+    // Entering a level repoints the entrance byte before $1935 says "in a
+    // level" (log 2026-08-02: BNK cp 63->18 at inLvl=00, mode 11). That is
+    // load-time setup, not a checkpoint. (The overworld can't serve as the
+    // "outside a level" case here: arriving on the map banks by design.)
     [Fact]
-    public void EntranceShiftOnTheOverworld_DoesNotBank()
+    public void EntranceShiftDuringLevelLoad_DoesNotBank()
     {
+        const byte LoadLevelMode = 0x11;
         var c = new JumpCounter(); var m = new FakeSnesMemory();
         Poll(c, m, LevelMainMode, 0x00, 0x04, level: 1, cp: 3);
         Poll(c, m, LevelMainMode, 0x0B, 0x00, level: 1, cp: 3);          // jump: total 1
-        Poll(c, m, OverworldMode, 0x00, 0x00, level: 0, cp: 8);          // not in a level
+        Poll(c, m, LoadLevelMode, 0x00, 0x00, level: 0, cp: 8);          // sublevel load: not in a level yet
         Assert.True(c.ValueIsAlert);
     }
 

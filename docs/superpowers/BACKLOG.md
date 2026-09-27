@@ -46,20 +46,19 @@ struck through. Priorities set 2026-09-26.
   - The play gate is not the cause: the only sub-`0C` writes were the file
     load at mode `0A` (`exits 00->52`, `lvlflags[00] 00->0F`), which is
     exactly what the gate is for.
-  Rule v2, on returning to the map: exit event fired → banked already;
-  else the intro (room `C5`) → bank; else Mario's map position differs from
-  where he stood when he entered → bank (the level moved him: route
-  advanced); else → discard. The exit flag plays no part beyond the event:
-  a death is already reverted by the dying edge and doesn't move Mario, a
-  start+select doesn't move him, and an exit-to-map that does move him
-  banks whatever it wrote. Position works in vanilla too and needs no
-  autosave knowledge; a save itself is invisible from WRAM. This hack saves
-  on every map move (a common patch), which is why the pipe felt "kept".
-  Implemented as `LevelLeaveDetector` (commit 88f009e), wired into every
-  banked counter, Exits and Kills. Unverified live: that `$1F11/$1F17-$1F1A`
-  are the bytes that move on a pipe-to-map and hold still on start+select
-  and a Yoshi's House side exit. Those three cases, with the log on, close
-  this entry; if the bytes are wrong it is three constants.
+  Rule (final, 2026-09-26): **death is the only discard.** Every other
+  return to the map banks the collect counters — start+select keeps the
+  mushroom, the coins and the moons, so "nothing kept" was false for them,
+  and one rule for all counters is the only one the checkbox's name can
+  explain. Exits keep a guard: a finish collected without the exit event
+  (side exit, start+select) reverts, since re-doing it would count twice;
+  the intro finish (room `C5`, no event) banks. No map-position check, no
+  autosave knowledge; a save itself is invisible from WRAM. A position-based
+  variant was tried first (commit 88f009e) and dropped the same day; the
+  `owx`/`owy`/`submap` traces it needed stay in the log as evidence.
+  Live check owed: start+select after a pickup keeps it (was reverting
+  under the position variant), the intro orb banks the Exit, a pipe-to-map
+  banks.
 - **Powerup counting v2: count level pickups, not reserve-box juggling.**
   2026-09-26 observations: a mushroom or flower grabbed while already
   powered goes to the reserve and does not count (correct: not used yet); a

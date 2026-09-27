@@ -58,7 +58,6 @@ internal sealed class MoonCounter : BankedCounter
     }
 
     protected override bool DetectBank(ISnesMemory memory) => bank.DetectBank(memory);
-    protected override bool DetectDiscard(ISnesMemory memory) => bank.LeaveDiscarded;
 
     protected override void ClearDetectors()
     {

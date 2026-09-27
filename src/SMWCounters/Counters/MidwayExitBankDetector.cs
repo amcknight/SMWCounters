@@ -28,18 +28,15 @@ internal sealed class MidwayExitBankDetector
     // checkpoint; kaizosplits suppresses that with the same bookkeeping.
     private byte firstRoom;
 
-    // Set by DetectBank: the level was just left with nothing kept, so the
-    // owner should discard unbanked collects as it would on a death.
-    public bool LeaveDiscarded { get; private set; }
-
+    // Banks on a checkpoint, the exit event, or any return to the map: death
+    // is the only discard, and the dying edge handles it before Mario gets
+    // back to the map (see LevelLeaveDetector).
     public bool DetectBank(ISnesMemory memory)
     {
         bool banked = DetectMidway(memory);
         if (DetectCheckpointEntrance(memory)) { banked = true; }
         if (levelExit.DetectExit(memory)) { banked = true; }
-        LevelLeave verdict = leave.Detect(memory);
-        if (verdict == LevelLeave.Kept) { banked = true; }
-        LeaveDiscarded = verdict == LevelLeave.NotKept;
+        if (leave.Detect(memory) != LevelLeave.None) { banked = true; }
         return banked;
     }
 
@@ -50,7 +47,6 @@ internal sealed class MidwayExitBankDetector
         previousCpEntrance.Clear();
         levelExit.Clear();
         leave.Clear();
-        LeaveDiscarded = false;
         firstRoom = 0;
     }
 
