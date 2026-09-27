@@ -30,8 +30,12 @@ struck through. Priorities set 2026-09-26.
   exit flag `$0DD5`):
   - Goal exit: `exitMode 00->01` at mode `0C` (2026-08-04 log). Banks.
   - Death: dying edge, then `exitMode 00->80` at mode `0B`, `0C 0D 0E`.
-  - Start+select: `exitMode 00->80` at mode `0B`, no dying edge (18:23:26,
-    level 42). Same bytes as a death minus the edge.
+  - Exit-to-map from room `01E` (18:23:26, overworld slot `42`, ~1 s after
+    piping back in from `050`): `exitMode 00->80` at mode `0B`, no dying
+    edge, no start+select pressed, and Mario reportedly landed elsewhere on
+    the map. So `80` is written by at least three things — death,
+    start+select, and some "exit to overworld" screen exit — and does not by
+    itself mean "nothing kept".
   - Intro finish (book orb): Exits collects on the finish trigger, then
     `14->0B->0C->0D->0E` with `exitMode` still `00`; room `C5` (the vanilla
     intro level number) identifies it.
@@ -42,16 +46,17 @@ struck through. Priorities set 2026-09-26.
   - The play gate is not the cause: the only sub-`0C` writes were the file
     load at mode `0A` (`exits 00->52`, `lvlflags[00] 00->0F`), which is
     exactly what the gate is for.
-  Rule v1: exit event → bank; `exitMode 80` → discard (death already,
-  start+select joins it); silent leave → bank if the intro (room `C5`) or if
-  Mario's map position differs from his position when he entered the level
-  (the pipe moved him: route advanced), else discard (side exit, nothing
-  kept). Position works in vanilla too and needs no autosave knowledge; a
-  save itself is invisible from WRAM. This hack saves on every map move (a
-  common patch), which is why the pipe felt "kept".
-  Gate: one more pipe run with `submap`/`owx`/`owy` traced (added), plus a
-  start+select from a beaten level and a Yoshi's House side exit for the
-  no-move controls.
+  Rule v2, on returning to the map: exit event fired → banked already;
+  else the intro (room `C5`) → bank; else Mario's map position differs from
+  where he stood when he entered → bank (the level moved him: route
+  advanced); else → discard. The exit flag plays no part beyond the event:
+  a death is already reverted by the dying edge and doesn't move Mario, a
+  start+select doesn't move him, and an exit-to-map that does move him
+  banks whatever it wrote. Position works in vanilla too and needs no
+  autosave knowledge; a save itself is invisible from WRAM. This hack saves
+  on every map move (a common patch), which is why the pipe felt "kept".
+  Gate: one more run with `submap`/`owx`/`owy` traced (added): the pipe
+  again, a start+select, and a Yoshi's House side exit as no-move controls.
 - **Powerup counting v2: count level pickups, not reserve-box juggling.**
   2026-09-26 observations: a mushroom or flower grabbed while already
   powered goes to the reserve and does not count (correct: not used yet); a
