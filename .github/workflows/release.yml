@@ -42,6 +42,9 @@ jobs:
       - name: Build (Release)
         run: dotnet build src/SMWCounters/SMWCounters.csproj -c Release -p:Version=${{ steps.ver.outputs.versionClean }}
 
+      - name: Test
+        run: dotnet test test/SMWCounters.Tests/SMWCounters.Tests.csproj -c Release -p:Version=${{ steps.ver.outputs.versionClean }}
+
       - name: Stage release assets
         id: stage
         shell: pwsh
@@ -80,9 +83,11 @@ jobs:
 
             Works with any SNES emulator build (RetroArch, snes9x, bsnes, higan,
             Mesen, BizHawk, ares, Mednafen) running Super Mario World — WRAM is
-            found automatically, no per-version configuration. The LiveSplit
-            timer must be running for counts to increment; the status dot shows
-            connection health at all times.
+            found automatically, no per-version configuration. SA-1 hacks are
+            not supported yet. Counts increment while the LiveSplit timer runs,
+            or always if you untick "Only count when timer running" in the
+            component settings; the status pixel shows connection health at
+            all times. See the README for what each counter counts.
           files: |
             ${{ steps.stage.outputs.dll }}
             ${{ steps.stage.outputs.snesdll }}
