@@ -26,15 +26,32 @@ struck through. Priorities set 2026-09-26.
   - Leaving without progress recorded reverts like a death. Decided for orbs
     and goals 2026-09-26: keeping the collect pending would double count when
     the goal is redone. Start+select is the same case.
-  Gates: one logged session (below). Also check whether the pipe's exit
-  event landed at a game mode below `0x0C` and was swallowed by the play
-  gate; the `BNK mode` and `BNK lvlflags` lines answer both questions.
-  Hack-dependence, found 2026-09-26: this hack saves on every overworld
-  move (a common autosave patch), so "back on the map alive" is progress
-  kept here, while vanilla and unpatched hacks save only at the save prompt.
-  The rule must hold on both; a save itself is invisible from WRAM, so if
-  the flags byte doesn't move for the pipe case the fallback is a per-hack
-  "autosaves on the map" setting.
+  Leave signatures from the 2026-09-26 18:18 session (game mode `$0100`,
+  exit flag `$0DD5`):
+  - Goal exit: `exitMode 00->01` at mode `0C` (2026-08-04 log). Banks.
+  - Death: dying edge, then `exitMode 00->80` at mode `0B`, `0C 0D 0E`.
+  - Start+select: `exitMode 00->80` at mode `0B`, no dying edge (18:23:26,
+    level 42). Same bytes as a death minus the edge.
+  - Intro finish (book orb): Exits collects on the finish trigger, then
+    `14->0B->0C->0D->0E` with `exitMode` still `00`; room `C5` (the vanilla
+    intro level number) identifies it.
+  - Yoshi's House side exit: `14->0B->...` with `exitMode 00`, same as the
+    intro.
+  - Pipe-to-map (level 42): `14->0F->10->11->0C->0D->0E`, `exitMode 00`,
+    level flags and exits unchanged; the step on the map wrote nothing.
+  - The play gate is not the cause: the only sub-`0C` writes were the file
+    load at mode `0A` (`exits 00->52`, `lvlflags[00] 00->0F`), which is
+    exactly what the gate is for.
+  Rule v1: exit event → bank; `exitMode 80` → discard (death already,
+  start+select joins it); silent leave → bank if the intro (room `C5`) or if
+  Mario's map position differs from his position when he entered the level
+  (the pipe moved him: route advanced), else discard (side exit, nothing
+  kept). Position works in vanilla too and needs no autosave knowledge; a
+  save itself is invisible from WRAM. This hack saves on every map move (a
+  common patch), which is why the pipe felt "kept".
+  Gate: one more pipe run with `submap`/`owx`/`owy` traced (added), plus a
+  start+select from a beaten level and a Yoshi's House side exit for the
+  no-move controls.
 - **Powerup counting v2: count level pickups, not reserve-box juggling.**
   2026-09-26 observations: a mushroom or flower grabbed while already
   powered goes to the reserve and does not count (correct: not used yet); a

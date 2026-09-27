@@ -78,6 +78,11 @@ internal sealed class DebugLogger
                                 // exit shows its exitMode + lvl context
         ("pstate",   0x0019),   // powerup state — midway/reserve powerup evidence
         ("reserve",  0x0DC2),   // reserve-box item — collects that skip the grow
+        ("submap",   0x1F11),   // Mario's overworld submap
+        ("owx",      0x1F17),   // Mario's overworld X (lo, hi) — a silent leave
+        ("owxh",     0x1F18),   //   that moved Mario advanced the route
+        ("owy",      0x1F19),   // Mario's overworld Y (lo, hi)
+        ("owyh",     0x1F1A),
     };
 
     // Sprite tables.
