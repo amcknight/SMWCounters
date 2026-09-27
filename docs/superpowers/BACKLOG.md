@@ -7,7 +7,7 @@ struck through. Priorities set 2026-09-26.
 
 ## Now — before tagging v0.6.0
 
-- **Leaving a level without an exit event leaves collects gold.** Seen
+- **Level-leave rule: shipped on unit tests, needs its live pass.** Seen
   2026-09-26: the hack's intro ends on a "book" orb — Exits collected on the
   finish trigger, no level-exit event fired, and Exits sat gold on the
   overworld until a later death. A jump in the intro stayed gold into the
@@ -55,8 +55,11 @@ struck through. Priorities set 2026-09-26.
   banks whatever it wrote. Position works in vanilla too and needs no
   autosave knowledge; a save itself is invisible from WRAM. This hack saves
   on every map move (a common patch), which is why the pipe felt "kept".
-  Gate: one more run with `submap`/`owx`/`owy` traced (added): the pipe
-  again, a start+select, and a Yoshi's House side exit as no-move controls.
+  Implemented as `LevelLeaveDetector` (commit 88f009e), wired into every
+  banked counter, Exits and Kills. Unverified live: that `$1F11/$1F17-$1F1A`
+  are the bytes that move on a pipe-to-map and hold still on start+select
+  and a Yoshi's House side exit. Those three cases, with the log on, close
+  this entry; if the bytes are wrong it is three constants.
 - **Powerup counting v2: count level pickups, not reserve-box juggling.**
   2026-09-26 observations: a mushroom or flower grabbed while already
   powered goes to the reserve and does not count (correct: not used yet); a
@@ -79,13 +82,14 @@ struck through. Priorities set 2026-09-26.
   range, or a despawn path that skips the dead set. Gate: the `SPR` trace
   for one fish kill.
 - **The one logged session that feeds the three entries above.** Debug log
-  on, then: finish the intro; start+select out of a level after a jump; the
-  pipe-to-map level; a side exit if the hack has one; a mushroom while big; a
-  flower while fire; a feather while fire, then Select-drop and retake the
-  flower twice; a midway while small; a Rip Van Fish killed by a shell and by
-  a cape spin. Read `BNK mode`/`BNK lvlflags`/`BNK exitMode` around each
-  leave, `BNK pstate`/`BNK reserve` around each pickup, and `SPR` for the
-  fish.
+  on, then: the pipe-to-map level again; start+select out of a level after a
+  jump; in and out of Yoshi's House; a mushroom while big; a flower while
+  fire; a feather while fire, then Select-drop and retake the flower twice;
+  a midway while small; a Rip Van Fish killed by a shell and by a cape spin.
+  Read `BNK owx`/`owy`/`submap` around each leave, `BNK pstate`/`BNK
+  reserve` around each pickup, and `SPR` for the fish. Done 2026-09-26 18:18:
+  intro finish, a death, the pipe-to-map, and an exit-to-map (signatures
+  recorded above).
 - **Screenshot.** The README still carries a TODO for a picture of the
   component in a LiveSplit layout.
 - **Live smoke still owed:** the play gate (a title-screen demo death and a
@@ -166,6 +170,10 @@ struck through. Priorities set 2026-09-26.
   Settings. Only with a genuinely easy UI.
 - **Shareable settings code.** Compact code for the whole settings choice
   plus a Set button. A good problem to have; after the tool has users.
+- **SRAM access from SNES.dll (snes_offsets ask).** SRAM lives in the
+  emulator's memory like WRAM, so it is discoverable the same way. Diffing
+  it against the WRAM save block would make "did the game save" answerable,
+  which nothing in WRAM can. Only needed if a save-based tier ever returns.
 - **Overflow wrap/shrink.** Revisit only now that value widths are stable;
   wrap would still change component height mid-run.
 - **Settings dialog is fixed-size.** Widen or make resizable if cramped.
