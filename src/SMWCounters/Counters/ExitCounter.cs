@@ -20,6 +20,8 @@ internal sealed class ExitCounter : BankedCounter
     private readonly PreviousByte previousFanfare = new();
     private readonly PreviousByte previousIo = new();
     private readonly LevelExitDetector levelExit = new();
+    private readonly LevelLeaveDetector leave = new();
+    private bool leaveDiscarded;
 
     public override bool HasBankToggle => false;
 
@@ -56,12 +58,25 @@ internal sealed class ExitCounter : BankedCounter
         return goal || orb || key || boss ? 1 : 0;
     }
 
-    protected override bool DetectBank(ISnesMemory memory) => levelExit.DetectExit(memory);
+    // Bank on the exit event, or on a kept leave (the intro finish fires no
+    // event); an orb/goal collected then abandoned (side exit, start+select)
+    // is discarded, since re-doing it would otherwise count twice.
+    protected override bool DetectBank(ISnesMemory memory)
+    {
+        bool banked = levelExit.DetectExit(memory);
+        LevelLeave verdict = leave.Detect(memory);
+        leaveDiscarded = verdict == LevelLeave.NotKept;
+        return banked || verdict == LevelLeave.Kept;
+    }
+
+    protected override bool DetectDiscard(ISnesMemory memory) => leaveDiscarded;
 
     protected override void ClearDetectors()
     {
         previousFanfare.Clear();
         previousIo.Clear();
         levelExit.Clear();
+        leave.Clear();
+        leaveDiscarded = false;
     }
 }

@@ -21,17 +21,25 @@ internal sealed class MidwayExitBankDetector
     private readonly PreviousByte previousLevelNum = new();
     private readonly PreviousByte previousCpEntrance = new();
     private readonly LevelExitDetector levelExit = new();
+    private readonly LevelLeaveDetector leave = new();
 
     // The room the current level started in. Entering a level repoints the
     // entrance byte at its own first room, which is setup rather than a
     // checkpoint; kaizosplits suppresses that with the same bookkeeping.
     private byte firstRoom;
 
+    // Set by DetectBank: the level was just left with nothing kept, so the
+    // owner should discard unbanked collects as it would on a death.
+    public bool LeaveDiscarded { get; private set; }
+
     public bool DetectBank(ISnesMemory memory)
     {
         bool banked = DetectMidway(memory);
         if (DetectCheckpointEntrance(memory)) { banked = true; }
         if (levelExit.DetectExit(memory)) { banked = true; }
+        LevelLeave verdict = leave.Detect(memory);
+        if (verdict == LevelLeave.Kept) { banked = true; }
+        LeaveDiscarded = verdict == LevelLeave.NotKept;
         return banked;
     }
 
@@ -41,6 +49,8 @@ internal sealed class MidwayExitBankDetector
         previousLevelNum.Clear();
         previousCpEntrance.Clear();
         levelExit.Clear();
+        leave.Clear();
+        LeaveDiscarded = false;
         firstRoom = 0;
     }
 

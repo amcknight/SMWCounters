@@ -215,6 +215,12 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
             killsSaved = kills;
             destructionSaved = destruction;
         }
+        if (bank.LeaveDiscarded)
+        {
+            kills = killsSaved;
+            destruction = destructionSaved;
+            ClearInFlightEvidence();
+        }
     }
 
     // Death invalidates in-flight evidence: pending fireball coins, open coin

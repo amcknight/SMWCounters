@@ -76,10 +76,16 @@ internal abstract class BankedCounter : ISmwCounter, IBankToggleCounter
         int delta = DetectCollectDelta(memory);
         if (delta > 0) { total += delta; plain += delta; }
         if (DetectBank(memory)) { saved = total; }
+        if (DetectDiscard(memory)) { total = saved; }
     }
 
     // Default die-to-discard: rising edge of $0071 to the dying value.
     protected virtual bool DetectDeath(ISnesMemory memory) => deathEdge.Detect(memory);
+
+    // A non-death discard: the level was left with nothing kept (see
+    // LevelLeaveDetector). Runs after DetectBank so a subclass can derive it
+    // from the same detector that produced this poll's bank verdict.
+    protected virtual bool DetectDiscard(ISnesMemory memory) => false;
 
     // Number of collects detected this poll (0 = none). Most counters are
     // 0/1 edge detectors; coins arrive as multi-unit deltas.
