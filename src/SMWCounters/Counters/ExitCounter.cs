@@ -6,9 +6,12 @@ namespace LiveSplit.SmwCounters.Counters;
 
 // Collect on the early level-finish event (goal / orb / key / boss), matching
 // kaizosplits' finish detection, so the alert spans finish -> level exit. Bank
-// on the level-exit event itself (see LevelExitDetector). Switch palaces are
-// intentionally excluded: they end without a finish event, so collecting on one
-// would leave the alert stuck with no bank to clear it.
+// on the level-exit event (see LevelExitDetector), or on the intro finish,
+// which fires no event but can never be replayed. Any other return to the map
+// with a finish still unbanked reverts it (see LevelLeaveDetector), so re-doing
+// it can't count twice. Switch palaces are intentionally excluded: they end
+// without a finish event, so collecting on one would leave the alert stuck
+// with no bank to clear it.
 internal sealed class ExitCounter : BankedCounter
 {
     private const int FanfareOffset = 0x0906;        // level-clear fanfare trigger

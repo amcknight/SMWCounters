@@ -3,7 +3,8 @@ using LiveSplit.SmwCounters.Snes;
 namespace LiveSplit.SmwCounters.Counters;
 
 // Shared "progress is safe now" edge for BankedCounters: the player reached a
-// checkpoint or finished the level, so unbanked collects stop being at risk.
+// checkpoint, finished the level, or got back to the map any way but death,
+// so unbanked collects stop being at risk.
 //
 // Checkpoint mirrors kaizosplits' Watchers.CP = Midway || CPEntrance. The
 // vanilla midway flag ($13CE) alone is not enough: kaizo hacks routinely ship

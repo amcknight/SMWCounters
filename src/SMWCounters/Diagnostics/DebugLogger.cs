@@ -19,8 +19,9 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 //                                              counting but not on the overlay)
 //   BNK <signal> <old>-><new> | mode=.. inLvl=.. lvl=.. room=.. cp=.. exitMode=..
 //       exits=.. midway=..
-//       signals: midway cp exitMode exits lvl room mode pstate reserve, plus
-//       lvlflags[<lvl>] for the current level's overworld flags byte
+//       signals: midway cp exitMode exits lvl room mode pstate reserve submap
+//       owx owxh owy owyh, plus lvlflags[<lvl>] for the current level's
+//       overworld flags byte
 //                                             (a byte the banking logic keys off
 //                                              of changed — answers "did the
 //                                              checkpoint actually fire, and
@@ -78,11 +79,11 @@ internal sealed class DebugLogger
                                 // exit shows its exitMode + lvl context
         ("pstate",   0x0019),   // powerup state — midway/reserve powerup evidence
         ("reserve",  0x0DC2),   // reserve-box item — collects that skip the grow
-        ("submap",   0x1F11),   // Mario's overworld submap
-        ("owx",      0x1F17),   // Mario's overworld X (lo, hi) — a silent leave
-        ("owxh",     0x1F18),   //   that moved Mario advanced the route
-        ("owy",      0x1F19),   // Mario's overworld Y (lo, hi)
-        ("owyh",     0x1F1A),
+        ("submap",   0x1F11),   // Mario's overworld submap and X/Y (lo, hi):
+        ("owx",      0x1F17),   //   evidence only — where a leave put Mario on
+        ("owxh",     0x1F18),   //   the map. Banking does not read them; the
+        ("owy",      0x1F19),   //   position-based leave rule was dropped
+        ("owyh",     0x1F1A),   //   2026-09-26 (see LevelLeaveDetector).
     };
 
     // Sprite tables.
@@ -102,9 +103,9 @@ internal sealed class DebugLogger
 
     // Per-translevel overworld flags ($1EA2 + level number): beaten / secret
     // beaten / midway bits. This is the block the game writes to SRAM, so a
-    // change here is the nearest WRAM proxy for "progress the save will keep"
-    // — the candidate bank signal for exits that fire no $0DD5 event (pipe
-    // to map, 2026-09-26 session). Tracked for the current level only.
+    // change here is the nearest WRAM proxy for "progress the save will keep".
+    // Logged as evidence only; banking does not read it (every non-death
+    // leave banks, see LevelLeaveDetector). Tracked for the current level only.
     private const int LevelNumber = 0x13BF;
     private const int LevelFlagsBase = 0x1EA2;
     private readonly PreviousByte prevLevelFlags = new();
@@ -228,8 +229,7 @@ internal sealed class DebugLogger
             }
             if (prevBankSignal[i].HasPrevious && prevBankSignal[i].Value != value)
             {
-                Write($"BNK {name} {prevBankSignal[i].Value:X2}->{value:X2} | "
-                    + $"mode={Hex(mem, GameMode)} inLvl={Hex(mem, InLevel)} " + BankContext(mem));
+                WriteBank(mem, name, prevBankSignal[i].Value, value);
             }
             prevBankSignal[i].Set(value);
         }
@@ -253,11 +253,16 @@ internal sealed class DebugLogger
         }
         if (prevLevelFlags.HasPrevious && prevLevelFlags.Value != flags)
         {
-            Write($"BNK lvlflags[{lvl:X2}] {prevLevelFlags.Value:X2}->{flags:X2} | "
-                + $"mode={Hex(mem, GameMode)} inLvl={Hex(mem, InLevel)} " + BankContext(mem));
+            WriteBank(mem, $"lvlflags[{lvl:X2}]", prevLevelFlags.Value, flags);
         }
         prevLevelFlags.Set(flags);
     }
+
+    // One BNK line format for every bank-signal change, so the fixed table
+    // and the per-level flags byte can't drift apart.
+    private void WriteBank(ISnesMemory mem, string name, byte previous, byte current)
+        => Write($"BNK {name} {previous:X2}->{current:X2} | "
+            + $"mode={Hex(mem, GameMode)} inLvl={Hex(mem, InLevel)} " + BankContext(mem));
 
     private static string BankContext(ISnesMemory mem)
     {

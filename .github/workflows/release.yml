@@ -86,8 +86,9 @@ jobs:
             found automatically, no per-version configuration. SA-1 hacks are
             not supported yet. Counts increment while the LiveSplit timer runs,
             or always if you untick "Only count when timer running" in the
-            component settings; the status pixel shows connection health at
-            all times. See the README for what each counter counts.
+            component settings; the status pixel (on by default) shows
+            connection health whether or not the timer is running. See the
+            README for what each counter counts.
           files: |
             ${{ steps.stage.outputs.dll }}
             ${{ steps.stage.outputs.snesdll }}

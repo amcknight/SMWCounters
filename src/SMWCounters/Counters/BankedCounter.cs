@@ -8,7 +8,7 @@ namespace LiveSplit.SmwCounters.Counters;
 
 // Shared "collect, then bank or discard-on-death" counter tracking BOTH
 // histories every poll:
-//   banked:  collect => total += delta; die => total = saved (DeathEdge);
+//   banked:  collect => total += delta; die (or DetectDiscard) => total = saved;
 //            bank => saved = total (subclass DetectBank)
 //   plain:   collect => plain += delta; never reverted
 // Banked is a pure display selector — it never changes what is tracked:

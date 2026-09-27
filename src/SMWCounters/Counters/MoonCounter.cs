@@ -8,7 +8,8 @@ namespace LiveSplit.SmwCounters.Counters;
 // "Discard on death" toggle defaults OFF for moons (settings-level default),
 // so out of the box this displays the plain never-reverted history, identical
 // to the old standalone counter. Toggled on, moons show gold until a
-// midway/exit banks them and a death discards unbanked ones.
+// checkpoint, exit, or any return to the map banks them and a death discards
+// unbanked ones.
 //
 // The per-level dedupe mode was dropped 2026-08-04: it served one
 // hypothetical challenge run and interacted badly with death-reverts (the

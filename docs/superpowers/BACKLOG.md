@@ -14,18 +14,6 @@ struck through. Priorities set 2026-09-26.
   next level. Start+select after a jump leaves it gold on the overworld. A
   pipe-to-map level left every counter gold, yet the map position and path
   survived a reset, so the game saved and no bank signal saw it.
-  Rule, from "banked = the final route's tally":
-  - Intro finish banks (decided 2026-09-26): that progress is kept — die in
-    the intro and you replay it, finish it and you never see it again.
-  - Leaving with progress recorded banks. Today only the `$0DD5` exit event
-    and the `$1F2E` backstop count as "recorded"; the pipe-to-map case says
-    that set is incomplete. Candidate: the current level's overworld flags
-    byte (`$1EA2 + level`, beaten/secret/midway bits) — the block the save
-    routine copies to SRAM, so the nearest WRAM proxy for "the save will keep
-    this". A save itself leaves no WRAM trace, and autosave patches add none.
-  - Leaving without progress recorded reverts like a death. Decided for orbs
-    and goals 2026-09-26: keeping the collect pending would double count when
-    the goal is redone. Start+select is the same case.
   Leave signatures from the 2026-09-26 18:18 session (game mode `$0100`,
   exit flag `$0DD5`):
   - Goal exit: `exitMode 00->01` at mode `0C` (2026-08-04 log). Banks.
@@ -46,7 +34,7 @@ struck through. Priorities set 2026-09-26.
   - The play gate is not the cause: the only sub-`0C` writes were the file
     load at mode `0A` (`exits 00->52`, `lvlflags[00] 00->0F`), which is
     exactly what the gate is for.
-  Rule (final, 2026-09-26): **death is the only discard.** Every other
+  Rule (2026-09-26): **death is the only discard.** Every other
   return to the map banks the collect counters — start+select keeps the
   mushroom, the coins and the moons, so "nothing kept" was false for them,
   and one rule for all counters is the only one the checkbox's name can
@@ -85,7 +73,7 @@ struck through. Priorities set 2026-09-26.
   jump; in and out of Yoshi's House; a mushroom while big; a flower while
   fire; a feather while fire, then Select-drop and retake the flower twice;
   a midway while small; a Rip Van Fish killed by a shell and by a cape spin.
-  Read `BNK owx`/`owy`/`submap` around each leave, `BNK pstate`/`BNK
+  Read `BNK mode`/`BNK exitMode` around each leave, `BNK pstate`/`BNK
   reserve` around each pickup, and `SPR` for the fish. Done 2026-09-26 18:18:
   intro finish, a death, the pipe-to-map, and an exit-to-map (signatures
   recorded above).

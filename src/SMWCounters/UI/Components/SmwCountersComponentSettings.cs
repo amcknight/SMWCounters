@@ -33,7 +33,12 @@ public class SmwCountersComponentSettings : UserControl
     public int RowHeight { get; set; } = 45;
     public HAlignment Alignment { get; set; } = HAlignment.Center;
     // Digits every value cell reserves room for before it starts widening.
-    public int ReserveDigits { get; set; } = ValueWidth.DefaultDigits;
+    public int ReserveDigits
+    {
+        get => reserveDigits;
+        set => reserveDigits = ValueWidth.ClampDigits(value);   // the one clamp
+    }
+    private int reserveDigits = ValueWidth.DefaultDigits;
     // On (default): counters only tally during a live run. Off: they keep
     // counting with the timer stopped, for challenge runs that never start it.
     public bool OnlyCountWhileTimerRunning { get; set; } = true;
@@ -246,7 +251,7 @@ public class SmwCountersComponentSettings : UserControl
         {
             Minimum = ValueWidth.MinDigits,
             Maximum = ValueWidth.MaxDigits,
-            Value = ValueWidth.ClampDigits(ReserveDigits),
+            Value = ReserveDigits,
             Width = 42,
             Location = new Point(385, y + 1),
         };
@@ -385,7 +390,7 @@ public class SmwCountersComponentSettings : UserControl
         SyncManyCountersHint();
         if (txtReset != null) { txtReset.Text = FormatKey(ResetKey); }
         if (trkHeight != null) { trkHeight.Value = Math.Max(trkHeight.Minimum, Math.Min(trkHeight.Maximum, RowHeight)); }
-        if (numReserveDigits != null) { numReserveDigits.Value = ValueWidth.ClampDigits(ReserveDigits); }
+        if (numReserveDigits != null) { numReserveDigits.Value = ReserveDigits; }
         if (rdoLeft != null)
         {
             rdoLeft.Checked = Alignment == HAlignment.Left;
@@ -533,7 +538,7 @@ public class SmwCountersComponentSettings : UserControl
         ResetKey = rst != null && !string.IsNullOrEmpty(rst.InnerText) ? new KeyOrButton(rst.InnerText) : null;
         RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 45);
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
-        ReserveDigits = ValueWidth.ClampDigits(SettingsHelper.ParseInt(e["ReserveDigits"], ValueWidth.DefaultDigits));
+        ReserveDigits = SettingsHelper.ParseInt(e["ReserveDigits"], ValueWidth.DefaultDigits);
         ResetOnSplitsReset = SettingsHelper.ParseBool(e["ResetOnSplitsReset"], true);
         OnlyCountWhileTimerRunning = SettingsHelper.ParseBool(e["OnlyCountWhileTimerRunning"], true);
         DebugLog = SettingsHelper.ParseBool(e["DebugLog"], false);

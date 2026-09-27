@@ -200,7 +200,9 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
         // the exit-flag edge lands after the mode leaves $14 (2026-08-04 log:
         // BNK exitMode 00->01 at mode=0C), and $0071 death edges fire fine in
         // mode 14. Death exits park $0DD5 at 0x80, which LevelExitDetector
-        // excludes — dying never banks.
+        // excludes; the map arrival after a death does bank (LevelLeave),
+        // but the dying edge has already reverted, so nothing unbanked
+        // survives it.
         if (deathEdge.Detect(memory))
         {
             kills = killsSaved;

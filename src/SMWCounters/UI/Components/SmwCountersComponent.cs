@@ -52,7 +52,6 @@ public class SmwCountersComponent : IComponent
     // SimpleLabel.Brush is a plain property (never disposed by the label), so
     // sharing cached brushes across labels is safe.
     private Font rowFont;
-    private Font reserveFont;
     private readonly Dictionary<int, float> reserveWidths = new();
     private readonly Dictionary<int, SolidBrush> brushCache = new();
     private readonly System.Windows.Forms.ToolTip extrasToolTip = new();
@@ -345,9 +344,9 @@ public class SmwCountersComponent : IComponent
             float labelW = c.DefaultIcon != null
                 ? IconWidthFor(c.DefaultIcon, iconHeight)
                 : g.MeasureString(c.DefaultLabel, font).Width;
-            string valueText = endedFreeze.ValueFor(c).ToString("0");
-            float measuredW = g.MeasureString(valueText, font).Width;
-            int digits = ValueWidth.DigitsFor(endedFreeze.ValueFor(c), Settings.ReserveDigits);
+            int value = endedFreeze.ValueFor(c);
+            float measuredW = g.MeasureString(value.ToString("0"), font).Width;
+            int digits = ValueWidth.DigitsFor(value, Settings.ReserveDigits);
             float valueW = ValueWidth.Cell(measuredW, ReserveWidthFor(g, font, digits));
             cellWidths[c.Id] = (labelW, valueW);
             if (totalWidth > 0) { totalWidth += CellGap; }
@@ -398,16 +397,11 @@ public class SmwCountersComponent : IComponent
         }
     }
 
-    // Widest N-digit run for the row font, memoized per digit count; the
-    // cache empties when the row font is rebuilt. Ten measurements per new
+    // Widest N-digit run for the row font, memoized per digit count; GetRowFont
+    // empties the cache when it rebuilds the font. Ten measurements per new
     // digit count, none per frame.
     private float ReserveWidthFor(Graphics g, Font font, int digits)
     {
-        if (!ReferenceEquals(reserveFont, font))
-        {
-            reserveFont = font;
-            reserveWidths.Clear();
-        }
         if (!reserveWidths.TryGetValue(digits, out float w))
         {
             w = ValueWidth.Reserve(s => g.MeasureString(s, font).Width, digits);
@@ -425,6 +419,7 @@ public class SmwCountersComponent : IComponent
         {
             rowFont?.Dispose();
             rowFont = new Font(layoutFont.FontFamily, size, layoutFont.Style, GraphicsUnit.Pixel);
+            reserveWidths.Clear();   // digit-run widths were measured in the old font
         }
         return rowFont;
     }
