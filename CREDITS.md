@@ -13,7 +13,7 @@ fan-community speedrunning iconography for their respective counters:
 - `mushroom.png` &mdash; powerups counter (Super Mushroom sprite)
 - `kill.png` &mdash; kills/destruction counter
 - `coin.png` &mdash; coins counter
-- `dragoncoin.png` &mdash; dragon coins counter (a pixel-art likeness of the Dragon Coin, drawn for this project)
+- `dragoncoin.png` &mdash; dragon coins counter (Dragon Coin sprite)
 
 ## WRAM discovery
 
