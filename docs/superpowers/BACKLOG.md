@@ -77,6 +77,14 @@ struck through. Priorities set 2026-09-26.
   reserve` around each pickup, and `SPR` for the fish. Done 2026-09-26 18:18:
   intro finish, a death, the pipe-to-map, and an exit-to-map (signatures
   recorded above).
+- **Dragon Coins: shipped on unit tests 2026-10-17, live pass owed.** Counts
+  `$1420` (kaizosplits' `yoshiCoin`, live in its Yoshi's Revenge splits)
+  crossing to five in level-main; a plain counter, never gold, never
+  discarded, since the game keeps a level's coins collected across a death
+  once the fifth is taken. Check: the fifth coin ticks once; a sixth coin in
+  a six-coin level adds nothing; a death after the fifth keeps it; four,
+  a death, then five on re-entry counts once; a sublevel pipe mid-tally
+  carries the count across. The `BNK ycoin` trace records every pickup.
 - **Screenshot.** The README still carries a TODO for a picture of the
   component in a LiveSplit layout.
 - **Live smoke still owed:** the play gate (a title-screen demo death and a
@@ -85,7 +93,7 @@ struck through. Priorities set 2026-09-26.
   locks in, re-beating a level locks in again.
 - **Row spacing iteration.** 2026-09-26 review: too spread out; cell gap
   14→10px, icon-to-number 4→2px, reserve floor 3→2 with per-value growth by
-  digit count. Needs another look in a real layout. Seven counters at row
+  digit count. Needs another look in a real layout. Eight counters at row
   height 45 won't fit a default-width LiveSplit window; that's what the
   two-component hint is for.
 - **Tag v0.6.0.** csproj is 0.6.0 and the README matches. Pushing the tag
@@ -137,10 +145,6 @@ struck through. Priorities set 2026-09-26.
 
 ## Someday — low
 
-- **Dragon-coin counting.** Independent feature; nice for hacks that don't
-  track them. Vanilla tracks the in-level count at `$1422`; hacks that save
-  them across deaths keep a per-level bitfield elsewhere, which would also
-  fix the Coins die-revert for that portion. Gate: logged session.
 - **Pending-kill gold rendering for fireball coins.** Show the would-be kill
   in gold, revert if the coin despawns, lock in on collect; check the
   interaction with level end. Needs a pending count on the counter and

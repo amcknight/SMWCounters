@@ -2,9 +2,9 @@
 
 A [LiveSplit](https://livesplit.org/) layout component that shows live *Super
 Mario World* counters — **deaths**, **level exits**, **3-up moons**,
-**jumps**, **powerups**, **coins**, and **kills** — by reading SNES WRAM from
-your running emulator. Built for challenge runs (low%, low-jump, pacifist,
-deathless) on vanilla SMW and ROM hacks.
+**jumps**, **powerups**, **coins**, **dragon coins**, and **kills** — by
+reading SNES WRAM from your running emulator. Built for challenge runs (low%,
+low-jump, pacifist, deathless) on vanilla SMW and ROM hacks.
 
 <!-- TODO: add a screenshot of the component in a LiveSplit layout. -->
 
@@ -48,6 +48,7 @@ what it has been counting rather than starting from zero.
 | **Jumps** | Player-initiated jumps. Running off a ledge, enemy bounces, and mid-air presses do not count; jumping off Yoshi or out of water does. | hidden |
 | **Powerups** | Mushroom, feather, and flower pickups (the grow animation). | hidden |
 | **Coins** | Coins collected in levels, as a lifetime tally across 100-coin wraps. Shop deductions and off-level coin writes are ignored. | hidden |
+| **Dragon Coins** | Levels in which you collected five Dragon Coins. Ticks the moment the fifth coin is taken (the 1-up) and never again in that level, so a sixth coin adds nothing. | hidden |
 | **Kills** | Creatures killed: stomps, spin jumps, shell hits, fireballs, Yoshi eats, lava, goal-tape coins. Objects (throw blocks, springboards, P-switches, message boxes, …) are excluded. A **Destruction** mode counts everything destroyed instead, objects included. | hidden |
 
 ### Discard on death
@@ -63,6 +64,10 @@ Exits are the one counter with an extra rule: a goal, orb, key, or boss
 finish counts only once the level actually exits. Leave without that and
 the finish is dropped, so re-doing it can't count twice. The intro level's
 finish counts even though it never "exits".
+
+Dragon Coins never show gold and never discard: the game marks a level's
+coins collected the instant the fifth is taken, and they stay collected
+through a death, so the count is permanent the moment it ticks.
 
 Each banked counter has a **Discard on death** checkbox in settings. Both
 histories (with and without discards) are always tracked; the checkbox only

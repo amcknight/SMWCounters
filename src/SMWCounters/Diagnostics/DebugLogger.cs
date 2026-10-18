@@ -11,7 +11,7 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 // (per the "Debug log" setting), each poll appends event lines to a log file:
 //
 //   CTR <id> <old>-><new> [unbanked,hidden] | phase=.. <emu> | mode=.. inLvl=..
-//       anim=.. fanfare=.. io=.. boss=.. exits=.. moon=.. coins=..
+//       anim=.. fanfare=.. io=.. boss=.. exits=.. moon=.. coins=.. ycoin=..
 //                                             (a counter incremented; context is
 //                                              the WRAM the counters key off of.
 //                                              `unbanked` = the value is showing
@@ -20,7 +20,7 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 //   BNK <signal> <old>-><new> | mode=.. inLvl=.. lvl=.. room=.. cp=.. exitMode=..
 //       exits=.. midway=..
 //       signals: midway cp exitMode exits lvl room mode pstate reserve submap
-//       owx owxh owy owyh, plus lvlflags[<lvl>] for the current level's
+//       owx owxh owy owyh ycoin, plus lvlflags[<lvl>] for the current level's
 //       overworld flags byte
 //                                             (a byte the banking logic keys off
 //                                              of changed — answers "did the
@@ -63,6 +63,7 @@ internal sealed class DebugLogger
     private const int ExitsSaved = 0x1F2E; // exit: saved exit count
     private const int MoonByte = 0x13C5;   // moons collected this scene
     private const int CoinCount = 0x0DBF;        // fireball-coin collection correlation
+    private const int YoshiCoins = 0x1420;       // dragon coins taken this level
 
     // Everything the bank ("progress is safe now") edge keys off of, traced
     // byte-by-byte so a session can show which signal fired at a checkpoint.
@@ -84,6 +85,9 @@ internal sealed class DebugLogger
         ("owxh",     0x1F18),   //   the map. Banking does not read them; the
         ("owy",      0x1F19),   //   position-based leave rule was dropped
         ("owyh",     0x1F1A),   //   2026-09-26 (see LevelLeaveDetector).
+        ("ycoin",    0x1420),   // dragon coins this level — evidence only, for
+                                // the Dragon Coins live pass: every pickup, the
+                                // 5->6 of a sixth coin, the zero on level load.
     };
 
     // Sprite tables.
@@ -200,7 +204,7 @@ internal sealed class DebugLogger
                     + $"anim={Hex(mem, PlayerAnim)} fanfare={Hex(mem, Fanfare)} "
                     + $"io={Hex(mem, Io)} boss={Hex(mem, BossDefeat)} "
                     + $"exits={Hex(mem, ExitsSaved)} moon={Hex(mem, MoonByte)} "
-                    + $"coins={Hex(mem, CoinCount)}";
+                    + $"coins={Hex(mem, CoinCount)} ycoin={Hex(mem, YoshiCoins)}";
                 Write($"CTR {c.Id} {prev}->{cur}{Tags(c, isEnabled)} | phase={phase} {emuDesc} | {ctx}");
             }
         }

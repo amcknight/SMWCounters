@@ -87,6 +87,7 @@ public class SmwCountersComponent : IComponent
             new JumpCounter(),
             new PowerupCounter(),
             new CoinCounter(),
+            new DragonCoinCounter(),
             new KillCounter(),
         };
 
