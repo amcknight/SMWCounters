@@ -93,16 +93,17 @@ struck through. Priorities set 2026-09-26.
   (Scrap Diary pins lives at 99, so `lives=` is expected flat and proves
   nothing either way). Then, in this order where the hack allows: a placed
   1-Up; a block 1-Up; a flying golden 1-Up (Scrap Diary); Fishin' Lakitu in
-  Forest of Illusion 4; Yoshi's tongue on a 1-Up, then a swallow; a goal-tape
-  1-Up (expected to count); the bonus game (expected not to count, with no
-  `SPR` `$78` line at all; the author doubts the cluster-sprite claim, so
-  this is a named check); 100 coins, a fifth Dragon Coin, a moon, and a
-  bounce chain (none count); a 1-Up left to scroll off (no count); collect,
-  die, re-collect with discard off (counts twice) and with discard on (once,
-  gold until banked); +1/-1 hotkeys while paused, while running, and after
-  the final split. Read the `1UP … polls=` lines to confirm the 3-poll
-  window and the `SPR` trace for any `$78` vanish that produced no
-  candidate; the `BNK`-style context carries `lives=`.
+  Forest of Illusion 4 (author knows where to test); Yoshi's tongue on a
+  1-Up, then a swallow; a goal-tape 1-Up (expected to count); the bonus game
+  (expected not to count, with no `SPR` `$78` line at all; the 2026-10-24
+  design doubts the cluster-sprite claim, so this is a named check); 100
+  coins, a fifth Dragon Coin, a moon, and a bounce chain (none count); a
+  1-Up left to scroll off (no count); collect, die, re-collect with discard
+  off (counts twice) and with discard on (once, gold until banked); +1/−1
+  hotkeys while paused, while running, and after the final split. Read the
+  `1UP … polls=` lines to confirm the 3-poll window and the `SPR` trace
+  for any `$78` vanish that produced no candidate; the `CTR` context carries
+  `lives=`.
 - **1-Ups icon is a placeholder.** `Assets/oneup.png` is a byte-for-byte
   copy of `mushroom.png` (decided 2026-10-24, spec §5). The author supplies
   the 16×16 1-Up Mushroom sprite; the swap is a file replacement with no
@@ -145,20 +146,21 @@ struck through. Priorities set 2026-09-26.
   mount. Identity by sprite slot should hold since a live Yoshi keeps his
   slot; a respawn is a new Yoshi and counts again. Gate: one logged Yoshi
   session (slot behavior across hop-off/hop-on, despawn, respawn).
-- **Sprite identity machinery.** Decided 2026-10-24: valuable beyond 1-Ups
-  and worth an experiment of its own, but not a priority for the 1-Ups
-  counter (spec §9). Identity = (room `$010B`, `$161A` sprite-list index) for
-  level-placed sprites, recognized at first sighting by `$1540 == 0` and
-  `$1534 == 0` (not rising from a block, not a reserve drop) with
+- **Sprite identity machinery.** Decided 2026-10-24: potentially valuable
+  beyond 1-Ups and worth an experiment of its own, but not a priority for the
+  1-Ups counter (spec §9). Identity = (room `$010B`, `$161A` sprite-list
+  index) for level-placed sprites, recognized at first sighting by `$1540 ==
+  0` and `$1534 == 0` (not rising from a block, not a reserve drop) with
   `$1938[$161A] == 1`; block-emitted sprites inherit a stale `$161A` and must
   not be keyed. Identities commit when the count commits (immediately with
-  discard off, at the bank with discard on, forgotten on death), the rule
-  that keeps dedupe from fighting death-reverts, which sank the Moons
-  per-level dedupe dropped 2026-08-04. Candidates: 1-Ups dedupe (count a
-  placed 1-Up once across deaths and revisits), the Yoshi-as-powerup
-  identity sketched by slot above, any future once-per-placed-sprite rule.
-  Gate: the 1-Ups live pass's `1UP candidate … idx= rise= drop=` lines
-  across a death, then a design of its own scoped to the machinery.
+  discard off, at the bank with discard on, forgotten on death), the rule that
+  keeps dedupe from fighting death-reverts, which sank the Moons per-level
+  dedupe dropped 2026-08-04. Candidates: 1-Ups dedupe (count a placed 1-Up
+  once across deaths and revisits), the Yoshi-as-powerup identity sketched by
+  slot above, any future once-per-placed-sprite rule. Gate: one logged session
+  with `$161A`/`$1540`/`$1534` at first sighting and at vanish for a placed
+  1-Up and a block 1-Up, across a death; then a design of its own, scoped to
+  the machinery.
 - **Advanced kill config.** Editable creature filter behind an advanced
   settings surface, with a "last N kills" readout (N≈3) so a player can
   pause, see what just counted, and add it to the exclusion or inclusion
