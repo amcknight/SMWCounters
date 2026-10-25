@@ -275,7 +275,7 @@ git commit -m "refactor: KillCounter composes SpriteSlotTracker and Confirmation
   Constants: `GameModeOffset 0x0100`, `LevelMainMode 0x14`, `ScoreSpriteBase 0x16E1`, `ScoreSpriteSlots 6`, `LakituFishingBase 0x151C`, `LoadIndexBase 0x161A`, `RiseTimerBase 0x1540`, `ReserveDropBase 0x1534`, `OneUpMushroom 0x78`, `FlyingGoldenMushroom 0x7F`, `Lakitu 0x1E`, `FirstLifeText 0x0D`, `LastLifeText 0x10`, `MinCandidateStatus 0x07`.
 
   `DetectCollectDelta(ISnesMemory memory)`, in this order:
-  1. Gate: `!LevelGate.IsLevelMain(memory)` → `ClearDetectors()` (clears slots, window, score-sprite previous, Lakitu previous, bank) and return 0.
+  1. Gate: `!LevelGate.IsLevelMain(memory)` → `ClearCollectState()` (slots, window, score-sprite previous, Lakitu previous) and return 0. The gate must not clear the bank detector: `BankedCounter.Poll` asks it for the exit / map-arrival verdict right after `DetectCollectDelta` returns.
   2. Read `$16E1..$16E6` into `PreviousByte[6]` tracking: `n` = count of slots with a previous value where current is in `0x0D..0x10` and `current != previous`. Unreadable slot → clear its previous.
   3. `slots.Read(memory)`. For each slot `i`:
      - `!Ok(i)` → `lakituPrev[i].Clear(); window.Disarm(i); continue`.
@@ -285,7 +285,7 @@ git commit -m "refactor: KillCounter composes SpriteSlotTracker and Confirmation
      - Lakitu previous upkeep: when `s == 0x1E` read `$151C+i` into `lakituPrev[i]` (clear on read failure); otherwise `lakituPrev[i].Clear()`.
   4. `slots.Commit()`.
   5. `int confirmed = window.Confirm(n); window.Tick(); return confirmed;`
-  `DetectBank` → `MidwayExitBankDetector.DetectBank`. `ClearDetectors` clears everything above. `Hex` is a private helper returning `"??"` on a failed read.
+  `DetectBank` → `MidwayExitBankDetector.DetectBank`. `ClearDetectors()` = `ClearCollectState()` plus the bank detector, as in `MoonCounter`/`PowerupCounter`. `Hex` is a private helper returning `"??"` on a failed read.
 
 - [ ] **Step 1: Write the failing tests**
 

@@ -177,6 +177,14 @@ struck through. Priorities set 2026-09-26.
   2026-08-04 log) should sit under the one setting. Gate: decision on
   fireball coins, then one logged goal-tape experiment with a non-goal exit
   as control.
+- **Hotkey marshalling anchor.** Noted 2026-10-24: if adjust-hotkey callbacks
+  are ever observed arriving off the UI thread while the settings dialog has
+  never been opened, marshal through `state.Form.BeginInvoke` (always has a
+  handle) instead of the settings control.
+- **1-Ups same-type score-sprite rewrite.** Noted 2026-10-24: the
+  confirmation signal cannot see a `$16E1` slot freed by its 48-frame expiry
+  and rewritten with the same 1UP type between two polls (`0D->0D`); `$16E7`
+  (the score-sprite timer) would disambiguate if the live pass ever shows it.
 - **Verification wanted (one session each):** does `$0DD5` shift on sublevel
   pipe/door transitions (would bank early)? Destruction tally spot-check
   (shipped on unit tests). Kills-row radios at 125%/150% DPI.

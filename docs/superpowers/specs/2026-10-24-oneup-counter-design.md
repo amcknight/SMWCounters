@@ -208,7 +208,7 @@ Two new global hotkeys alongside the existing Reset hotkey, using the same
 the same gamepad support for free:
 
 - **Increment hotkey** and **Decrement hotkey**, `KeyOrButton`, default
-  `None` (unbound). Registered in `RegisterHotKeys`, dispatched in the
+  **Page Up** and **Page Down**. Registered in `RegisterHotKeys`, dispatched in the
   component's `Hook_KeyOrButtonPressed` next to the Reset branch.
 - **Hotkey target**: a dropdown listing every counter by its label, default
   **1-Ups**. **Decided:** one target at a time, no modifier scheme. The
@@ -222,8 +222,18 @@ undo. For Kills it adjusts the displayed mode's tally, which is what the
 runner is looking at. The hotkeys work in every timer phase and regardless
 of "Only count while timer running", like Reset — **call:** the natural
 moment to fix a count is while paused. After an adjustment the settings
-value box is refreshed through the existing `RefreshValueBoxes` path (hook
-callbacks arrive off the UI thread; marshal as `CaptureKey` already does).
+value box is refreshed through the existing `RefreshValueBoxes` path, and
+the adjusted counter's own box is refreshed even while it has focus, so its
+stale text cannot later be committed over the nudge (hook callbacks arrive
+off the UI thread; marshal as `CaptureKey` already does).
+
+**Decided 2026-10-24: default-bound keys.** The keys ship bound to Page Up
+and Page Down rather than unbound. Page Up and Page Down collide with
+neither RetroArch's default keyboard hotkeys nor LiveSplit's, and a
+modifier combo is no escape hatch because RetroArch ignores modifiers. The
+accepted trade-off: these are global keys commonly pressed in other
+applications while LiveSplit is open, so a stray press nudges the target
+counter. LiveSplit's own default-bound global Reset (F2) is the precedent.
 
 **Call (from the builder check):** in `TimerPhase.Ended` the overlay is
 pinned by `EndedDisplayFreeze` at the final-split values. A hotkey
@@ -234,7 +244,9 @@ behavior; changing it is out of scope.
 
 Persistence: `IncrementKey`, `DecrementKey`, `HotkeyTarget` join the settings
 XML and `GetSettingsHashCode`, so a rebinding dirties the layout
-(`SettingsHashTests` gains cases). Missing elements load as unbound and
+(verified by review, see §10). Parse rule: an absent key element loads
+the default key (Page Up / Page Down); a present-but-empty element loads as
+unbound (the user cleared it). An absent or empty `HotkeyTarget` loads as
 `"oneups"`.
 
 ## 7. Debug log
@@ -331,4 +343,7 @@ re-capturing the frozen display; persistence round-trip and settings hash;
 and the Kill counter's existing fireball-coin suite passing unchanged over
 the shared pieces. README gains the counter row and a hotkeys paragraph;
 BACKLOG gains the §8 live pass; the release notes follow the existing
-convention.
+convention. The hotkey elements' inclusion in the settings hash is verified
+by review of `CreateSettingsNode`, not by a unit test: the settings control
+constructs a `CompositeHook`, which `SettingsHashTests`' static pattern
+cannot host.
