@@ -104,10 +104,6 @@ struck through. Priorities set 2026-09-26.
   `1UP … polls=` lines to confirm the 3-poll window and the `SPR` trace
   for any `$78` vanish that produced no candidate; the `CTR` context carries
   `lives=`.
-- **1-Ups icon is a placeholder.** `Assets/oneup.png` is a byte-for-byte
-  copy of `mushroom.png` (decided 2026-10-24, spec §5). The author supplies
-  the 16×16 1-Up Mushroom sprite; the swap is a file replacement with no
-  code change, plus the `oneup.png` line in CREDITS.md. Gate: the sprite.
 - **Screenshot.** The README still carries a TODO for a picture of the
   component in a LiveSplit layout.
 - **Live smoke still owed:** the play gate (a title-screen demo death and a
