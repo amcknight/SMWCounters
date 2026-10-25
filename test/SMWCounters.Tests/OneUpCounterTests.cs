@@ -102,19 +102,23 @@ public class OneUpCounterTests
 
     [Fact] public void GameModeGate_DropsArmedWindow()
     { var c = new OneUpCounter(); var m = new FakeSnesMemory();
-      Poll(c, m, Alive, OneUp, NoText); Poll(c, m, Gone, OneUp, NoText, mode: Overworld);
-      Poll(c, m, Gone, OneUp, NoText, mode: Level); Poll(c, m, Gone, OneUp, Text1Up, mode: Level); Assert.Equal(0, c.Value); }
+      Poll(c, m, Alive, OneUp, NoText); Poll(c, m, Gone, OneUp, NoText);          // arms
+      Poll(c, m, Gone, OneUp, NoText, mode: Overworld);                          // gate closes with the window armed
+      Poll(c, m, Gone, OneUp, NoText, mode: Level);                              // baselines the score table
+      Poll(c, m, Gone, OneUp, Text1Up); Assert.Equal(0, c.Value); }
 
     [Fact] public void ReadFailure_ThenReturn_NoCandidate()
     { var c = new OneUpCounter(); var m = new FakeSnesMemory();
       Poll(c, m, Alive, OneUp, NoText);
-      var blank = new FakeSnesMemory(); blank.SetByte(GameMode, Level); c.Poll(blank);   // slot unreadable
+      var blank = new FakeSnesMemory(); blank.SetByte(GameMode, Level); blank.SetByte(Score, NoText); c.Poll(blank);   // slot unreadable, score previous survives
       Poll(c, m, Gone, OneUp, Text1Up); Assert.Equal(0, c.Value); }
 
     [Fact] public void Detach_ClearsState()
     { var c = new OneUpCounter(); var m = new FakeSnesMemory();
       Poll(c, m, Alive, OneUp, NoText); m.Attached = false; c.Poll(m); m.Attached = true;
-      Poll(c, m, Gone, OneUp, Text1Up); Assert.Equal(0, c.Value); }
+      Poll(c, m, Gone, OneUp, NoText);    // would arm if the slot were remembered
+      Poll(c, m, Gone, OneUp, Text1Up);   // would confirm
+      Assert.Equal(0, c.Value); }
 
     [Fact] public void DiscardOff_DeathKeepsTheCount()
     { var c = new OneUpCounter { Banked = false }; var m = new FakeSnesMemory();
@@ -128,6 +132,34 @@ public class OneUpCounterTests
       Poll(c, m, Gone, OneUp, Text1Up, anim: 9); Assert.Equal(0, c.Value);
       Poll(c, m, Alive, OneUp, NoText); Poll(c, m, Gone, OneUp, Text2Up); Poll(c, m, Gone, OneUp, Text2Up, midway: 1);
       Assert.False(c.ValueIsAlert); Poll(c, m, Gone, OneUp, Text2Up, anim: 9); Assert.Equal(1, c.Value); }
+
+    [Fact] public void DiscardOn_LeavingToTheMap_Banks_ThenALaterDeathCannotTakeIt()
+    { var c = new OneUpCounter(); var m = new FakeSnesMemory(); m.SetByte(0x010B, 0x1E);
+      Poll(c, m, Alive, OneUp, NoText, mode: Overworld);
+      Poll(c, m, Alive, OneUp, NoText); Poll(c, m, Gone, OneUp, Text1Up);
+      Assert.Equal(1, c.Value); Assert.True(c.ValueIsAlert);
+      Poll(c, m, Gone, OneUp, Text1Up, mode: Overworld);          // start+select / side exit / pipe back to the map
+      Assert.False(c.ValueIsAlert);
+      Poll(c, m, Gone, OneUp, Text1Up); Poll(c, m, Gone, OneUp, Text1Up, anim: 9);   // die in the next level
+      Assert.Equal(1, c.Value); }
+
+    [Fact] public void DiscardOn_ExitEvent_Banks()
+    { var c = new OneUpCounter(); var m = new FakeSnesMemory(); m.SetByte(0x0DD5, 0x00);
+      Poll(c, m, Alive, OneUp, NoText); Poll(c, m, Gone, OneUp, Text1Up);
+      Assert.True(c.ValueIsAlert);
+      m.SetByte(0x0DD5, 0x01); Poll(c, m, Gone, OneUp, Text1Up, mode: 0x0C);   // goal exit: $0DD5 0->1 lands at mode 0C
+      Assert.False(c.ValueIsAlert); }
+
+    [Fact] public void Trace_EmitsSeenOnceBeforeCandidate()
+    { var c = new OneUpCounter(); var m = new FakeSnesMemory(); var log = new List<string>();
+      ((ITraceSource)c).Trace = log.Add;
+      m.SetByte(0x161A, 0x21); m.SetByte(0x1540, 0x32); m.SetByte(0x1534, 0x43);
+      Poll(c, m, Alive, OneUp, NoText); Poll(c, m, Alive, OneUp, NoText); Poll(c, m, Gone, OneUp, Text1Up);
+      Assert.Single(log, l => l.StartsWith("1UP seen slot0 #78 idx="));
+      Assert.Contains("1UP seen slot0 #78 idx=21 rise=32 drop=43", log);
+      int seen = log.FindIndex(l => l.StartsWith("1UP seen slot0"));
+      int candidate = log.FindIndex(l => l.StartsWith("1UP candidate slot0"));
+      Assert.True(candidate >= 0 && seen < candidate); }
 
     [Fact] public void Trace_EmitsCandidateAndConfirmation()
     { var c = new OneUpCounter(); var m = new FakeSnesMemory(); var log = new List<string>();

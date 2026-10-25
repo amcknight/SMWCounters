@@ -62,9 +62,12 @@ internal sealed class OneUpCounter : BankedCounter, ITraceSource
 
     protected override int DetectCollectDelta(ISnesMemory memory)
     {
+        // Collect state only: the bank detector must keep its in-level memory
+        // across this gate, since Poll asks it for the exit / map-arrival
+        // verdict right after this returns.
         if (!LevelGate.IsLevelMain(memory))
         {
-            ClearDetectors();
+            ClearCollectState();
             return 0;
         }
 
@@ -98,6 +101,15 @@ internal sealed class OneUpCounter : BankedCounter, ITraceSource
             }
 
             byte s = slots.Sprite(i);
+            byte t = slots.Status(i);
+            // $9E keeps a stale number on an empty slot, so a fresh spawn into
+            // a slot whose stale number already matches is still a sighting.
+            if (Trace != null && (s == OneUpMushroom || s == FlyingGoldenMushroom) && t != 0x00
+                && (!slots.HasPrevious(i) || slots.PreviousSprite(i) != s || slots.PreviousStatus(i) == 0x00))
+            {
+                Trace($"1UP seen slot{i} #{s:X2} idx={Hex(memory, LoadIndexBase + i)} rise={Hex(memory, RiseTimerBase + i)} drop={Hex(memory, ReserveDropBase + i)}");
+            }
+
             bool lakituFlagRead = false;
             byte lakituFlag = 0;
             if (s == Lakitu)
@@ -109,7 +121,6 @@ internal sealed class OneUpCounter : BankedCounter, ITraceSource
             {
                 byte ps = slots.PreviousSprite(i);
                 byte pt = slots.PreviousStatus(i);
-                byte t = slots.Status(i);
                 if ((ps == OneUpMushroom || ps == FlyingGoldenMushroom)
                     && pt >= MinCandidateStatus && (t == 0x00 || s != ps))
                 {
@@ -145,11 +156,16 @@ internal sealed class OneUpCounter : BankedCounter, ITraceSource
 
     protected override void ClearDetectors()
     {
+        ClearCollectState();
+        bank.Clear();
+    }
+
+    private void ClearCollectState()
+    {
         slots.Clear();
         window.Clear();
         foreach (PreviousByte p in scorePrevious) p.Clear();
         foreach (PreviousByte p in lakituPrevious) p.Clear();
-        bank.Clear();
     }
 
     private static string Hex(ISnesMemory memory, int offset)

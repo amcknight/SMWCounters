@@ -7,6 +7,9 @@ namespace LiveSplit.SmwCounters.Counters;
 // armed slot, otherwise the slot expires. The caller runs Confirm then Tick at
 // the end of a poll, so arming sets polls + 1 and a confirmation k polls after
 // arming reports polls=k, with k == WindowPolls the last confirmable poll.
+// Re-arming an armed slot resets it, so a `candidate` trace line can lack a
+// `confirmed`/`expired` partner if the same slot re-arms inside the window
+// (practically unreachable: the slot would need a second vanish that fast).
 internal sealed class ConfirmationWindow
 {
     private readonly int[] remaining;

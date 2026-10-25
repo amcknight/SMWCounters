@@ -38,14 +38,18 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 //                                              for a property-based creature filter that
 //                                              could replace the NotAlive ID blacklist)
 //   SCR slot<n> <old>-><new> | mode=..
-//                                             (a score-sprite slot ($16E1..) changed;
+//                                             (a score-sprite slot ($16E1..$16E6) changed;
 //                                              $0D..$10 are the 1UP family)
 //   LAK slot<n> 151C <old>-><new> | mode=..
 //                                             (a Lakitu's fishing flag changed; the
 //                                              drop to 00 is the bait being taken)
 //   1UP ... / COIN ...
 //                                             (written by the counters themselves via
-//                                              Trace: candidate, confirmed, expired)
+//                                              Trace: seen (1UP only), candidate,
+//                                              confirmed, expired. They are written
+//                                              during the counters' poll, so a tick's
+//                                              1UP/COIN lines precede that tick's
+//                                              SCR/SPR/CTR lines)
 //   SNS state=.. gen=.. base=0x.. method=.. rebind=.. [rivals=..] [contested]
 //       [reg=..] [cooldown] [err=".."] [rom=..] [win=".."] [scanMs=..]
 //                                             (SNES.dll discovery status, logged
@@ -76,18 +80,18 @@ internal sealed class DebugLogger
     // Context only; no counter reads it (the 1-Ups counter confirms on the
     // score sprite, not on lives) — this trace is how a session shows whether
     // a hack pins lives.
-    private const int PlayerLives = 0x0DBE;
+    private const int PlayerLives = 0x0DBE;      // lives (context only)
 
     // $0D..$10 are the 1UP family the 1-Ups counter confirms on; this trace
     // lines the signal up against each `1UP candidate` line and catches a
     // hack that never writes one.
-    private const int ScoreSpriteBase = 0x16E1;
-    private const int ScoreSpriteSlots = 6;
+    private const int ScoreSpriteBase = 0x16E1;  // score-sprite numbers ($16E1..$16E6)
+    private const int ScoreSpriteSlots = 6;      // score-sprite slot count
 
     // Nonzero = fishing (X-position low byte & $10 at init); it drops to zero
     // when Mario takes the bait — the 1-Ups counter's Lakitu candidate edge.
-    private const int LakituFishingBase = 0x151C;
-    private const byte LakituSprite = 0x1E;
+    private const int LakituFishingBase = 0x151C; // per-slot Lakitu fishing flag
+    private const byte LakituSprite = 0x1E;      // Fishin' Lakitu sprite number
 
     // Everything the bank ("progress is safe now") edge keys off of, traced
     // byte-by-byte so a session can show which signal fired at a checkpoint.
