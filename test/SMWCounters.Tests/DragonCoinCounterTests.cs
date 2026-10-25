@@ -177,7 +177,7 @@ public class DragonCoinCounterTests
     [Fact]
     public void HasNoDiscardOnDeathToggle()
     {
-        Assert.False(new DragonCoinCounter() is IBankToggleCounter);
+        Assert.False(typeof(IBankToggleCounter).IsAssignableFrom(typeof(DragonCoinCounter)));
     }
 
     [Fact]

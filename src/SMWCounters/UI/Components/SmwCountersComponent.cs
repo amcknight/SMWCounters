@@ -213,6 +213,7 @@ public class SmwCountersComponent : IComponent
         if (c == null) { return; }
         CounterAdjust.Apply(c, delta);
         endedFreeze.Recapture(c);
+        Settings.RefreshValueBox(c.Id);
         Settings.RefreshValueBoxes();
     }
 

@@ -501,6 +501,17 @@ public class SmwCountersComponentSettings : UserControl
         }
     }
 
+    // Refreshes one counter's value box even while it has focus: an adjust
+    // hotkey changed the value under it, and the box's stale text would
+    // otherwise be committed over the nudge when it loses focus.
+    internal void RefreshValueBox(string counterId)
+    {
+        foreach (CounterRow row in rows)
+        {
+            if (row.Id == counterId) { row.ValueBox.Text = row.GetValue().ToString(); }
+        }
+    }
+
     private void CaptureKey(TextBox box, Action<KeyOrButton> setter)
     {
         string previous = box.Text;
