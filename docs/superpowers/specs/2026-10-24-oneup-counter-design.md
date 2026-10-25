@@ -1,7 +1,7 @@
 # 1-Ups counter — collected 1-Up mushrooms, plus adjust hotkeys
 
-Draft 2026-10-24, awaiting the author's approval. Every choice is either
-the author's (marked **decided**) or the designer's call (marked **call**).
+Design approved 2026-10-24. Every choice is either the author's (marked
+**decided**) or the designer's call (marked **call**).
 Theme: a counter for the 1-Up mushrooms a level offers as collectibles — not
 lives gained — detected as "a 1-Up sprite vanished and the game acknowledged
 a 1-Up", with +1/−1 global hotkeys so a runner can correct the rare miscount
