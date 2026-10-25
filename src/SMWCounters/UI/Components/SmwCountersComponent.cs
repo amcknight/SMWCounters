@@ -194,7 +194,10 @@ public class SmwCountersComponent : IComponent
     {
         if (Settings.IsHandleCreated && Settings.InvokeRequired)
         {
-            Settings.BeginInvoke((Action)(() => AdjustOnUiThread(delta)));
+            // The handle can be destroyed between the check and the call;
+            // a dropped nudge is acceptable, a hook-thread exception is not.
+            try { Settings.BeginInvoke((Action)(() => AdjustOnUiThread(delta))); }
+            catch (InvalidOperationException) { }
         }
         else
         {

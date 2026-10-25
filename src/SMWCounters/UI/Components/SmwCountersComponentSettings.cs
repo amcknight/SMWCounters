@@ -202,7 +202,7 @@ public class SmwCountersComponentSettings : UserControl
 
         Controls.Add(new Label
         {
-            Text = "Adjust +1 hotkey (global):",
+            Text = "+1 hotkey (global):",
             Location = new Point(10, y + 3),
             AutoSize = true,
         });
@@ -219,7 +219,7 @@ public class SmwCountersComponentSettings : UserControl
 
         Controls.Add(new Label
         {
-            Text = "Adjust −1 hotkey (global):",
+            Text = "−1 hotkey (global):",
             Location = new Point(10, y + 3),
             AutoSize = true,
         });
@@ -462,9 +462,11 @@ public class SmwCountersComponentSettings : UserControl
         if (txtReset != null) { txtReset.Text = FormatKey(ResetKey); }
         if (txtIncrement != null) { txtIncrement.Text = FormatKey(IncrementKey); }
         if (txtDecrement != null) { txtDecrement.Text = FormatKey(DecrementKey); }
-        if (cboHotkeyTarget != null && cboHotkeyTarget.DataSource is List<KeyValuePair<string, string>> targets
-            && targets.Exists(t => t.Key == HotkeyTarget))
+        if (cboHotkeyTarget != null && cboHotkeyTarget.DataSource is List<KeyValuePair<string, string>> targets)
         {
+            // An unknown saved target (e.g. a counter since removed) falls back
+            // to the default, so the combo and the hotkeys always agree.
+            if (!targets.Exists(t => t.Key == HotkeyTarget)) { HotkeyTarget = "oneups"; }
             cboHotkeyTarget.SelectedValue = HotkeyTarget;
         }
         if (trkHeight != null) { trkHeight.Value = Math.Max(trkHeight.Minimum, Math.Min(trkHeight.Maximum, RowHeight)); }
