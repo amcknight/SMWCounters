@@ -10,7 +10,8 @@ namespace LiveSplit.UI.Components;
 // polling (the component's gate allows it) while the *display* pins to the
 // values captured at the split; undoing the split unfreezes and reveals the
 // live tally. Purely cosmetic: persistence and the settings UI always see
-// the live counter state.
+// the live counter state. A hotkey correction after the split re-captures
+// that one counter, so the fix shows through the freeze.
 internal sealed class EndedDisplayFreeze
 {
     private readonly Dictionary<string, (int Value, bool Alert)> frozen = new();
@@ -28,6 +29,12 @@ internal sealed class EndedDisplayFreeze
         {
             frozen[c.Id] = (c.Value, c.ValueIsAlert);
         }
+    }
+
+    public void Recapture(ISmwCounter counter)
+    {
+        if (!active) { return; }
+        frozen[counter.Id] = (counter.Value, counter.ValueIsAlert);
     }
 
     public int ValueFor(ISmwCounter counter)

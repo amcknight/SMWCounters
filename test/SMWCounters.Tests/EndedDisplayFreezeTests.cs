@@ -114,4 +114,24 @@ public class EndedDisplayFreezeTests
         Assert.Equal(3, freeze.ValueFor(deaths));
         Assert.True(freeze.AlertFor(deaths));
     }
+
+    [Fact]
+    public void Recapture_WhileEnded_ShowsTheAdjustedValue()
+    {
+        var c = new StubCounter { Value = 10 }; var freeze = new EndedDisplayFreeze();
+        freeze.OnPhase(isEnded: true, Counters(c));
+        c.Value = 11;                       // live tally moved under the freeze
+        Assert.Equal(10, freeze.ValueFor(c));
+        freeze.Recapture(c);                // hotkey correction
+        Assert.Equal(11, freeze.ValueFor(c));
+    }
+
+    [Fact]
+    public void Recapture_WhenNotEnded_IsANoOp()
+    {
+        var c = new StubCounter { Value = 3 }; var freeze = new EndedDisplayFreeze();
+        freeze.OnPhase(isEnded: false, Counters(c));
+        freeze.Recapture(c); c.Value = 4;
+        Assert.Equal(4, freeze.ValueFor(c));
+    }
 }

@@ -30,6 +30,10 @@ public class SmwCountersComponentSettings : UserControl
     private readonly List<string> toggleIds = new();
 
     public KeyOrButton ResetKey { get; set; }
+    public KeyOrButton IncrementKey { get; set; }
+    public KeyOrButton DecrementKey { get; set; }
+    // Id of the counter the adjust hotkeys nudge.
+    public string HotkeyTarget { get; set; } = "oneups";
     public int RowHeight { get; set; } = 45;
     public HAlignment Alignment { get; set; } = HAlignment.Center;
     // Digits every value cell reserves room for before it starts widening.
@@ -55,11 +59,17 @@ public class SmwCountersComponentSettings : UserControl
     {
         Hook = new CompositeHook(allowGamepads);
         ResetKey = new KeyOrButton(Keys.F2);
+        // PageUp/PageDown collide with neither RetroArch's nor LiveSplit's default hotkeys.
+        IncrementKey = new KeyOrButton(Keys.PageUp);
+        DecrementKey = new KeyOrButton(Keys.PageDown);
         Size = new Size(420, 240);
     }
 
     private readonly List<CounterRow> rows = new();
     private TextBox txtReset;
+    private TextBox txtIncrement;
+    private TextBox txtDecrement;
+    private ComboBox cboHotkeyTarget;
     private TrackBar trkHeight;
     private NumericUpDown numReserveDigits;
     private RadioButton rdoLeft;
@@ -188,6 +198,67 @@ public class SmwCountersComponentSettings : UserControl
         };
         txtReset.Enter += (_, __) => CaptureKey(txtReset, k => ResetKey = k);
         Controls.Add(txtReset);
+        y += 30;
+
+        Controls.Add(new Label
+        {
+            Text = "Adjust +1 hotkey (global):",
+            Location = new Point(10, y + 3),
+            AutoSize = true,
+        });
+        txtIncrement = new TextBox
+        {
+            ReadOnly = true,
+            Text = FormatKey(IncrementKey),
+            Location = new Point(120, y),
+            Width = 220,
+        };
+        txtIncrement.Enter += (_, __) => CaptureKey(txtIncrement, k => IncrementKey = k);
+        Controls.Add(txtIncrement);
+        y += 30;
+
+        Controls.Add(new Label
+        {
+            Text = "Adjust −1 hotkey (global):",
+            Location = new Point(10, y + 3),
+            AutoSize = true,
+        });
+        txtDecrement = new TextBox
+        {
+            ReadOnly = true,
+            Text = FormatKey(DecrementKey),
+            Location = new Point(120, y),
+            Width = 220,
+        };
+        txtDecrement.Enter += (_, __) => CaptureKey(txtDecrement, k => DecrementKey = k);
+        Controls.Add(txtDecrement);
+        y += 30;
+
+        Controls.Add(new Label
+        {
+            Text = "Hotkeys adjust:",
+            Location = new Point(10, y + 3),
+            AutoSize = true,
+        });
+        // DisplayMember/ValueMember bind to properties; tuple elements are
+        // fields, so the items are KeyValuePairs (Key = id, Value = label).
+        var targets = new List<KeyValuePair<string, string>>();
+        foreach (var c in counters) { targets.Add(new KeyValuePair<string, string>(c.Id, c.DefaultLabel)); }
+        cboHotkeyTarget = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(120, y),
+            Width = 220,
+        };
+        Controls.Add(cboHotkeyTarget);
+        cboHotkeyTarget.DataSource = targets;
+        cboHotkeyTarget.ValueMember = "Key";
+        cboHotkeyTarget.DisplayMember = "Value";
+        cboHotkeyTarget.SelectedValue = HotkeyTarget;
+        cboHotkeyTarget.SelectedValueChanged += (_, __) =>
+        {
+            if (cboHotkeyTarget.SelectedValue is string id) { HotkeyTarget = id; }
+        };
         y += 30;
 
         Controls.Add(new Label
@@ -389,6 +460,13 @@ public class SmwCountersComponentSettings : UserControl
         }
         SyncManyCountersHint();
         if (txtReset != null) { txtReset.Text = FormatKey(ResetKey); }
+        if (txtIncrement != null) { txtIncrement.Text = FormatKey(IncrementKey); }
+        if (txtDecrement != null) { txtDecrement.Text = FormatKey(DecrementKey); }
+        if (cboHotkeyTarget != null && cboHotkeyTarget.DataSource is List<KeyValuePair<string, string>> targets
+            && targets.Exists(t => t.Key == HotkeyTarget))
+        {
+            cboHotkeyTarget.SelectedValue = HotkeyTarget;
+        }
         if (trkHeight != null) { trkHeight.Value = Math.Max(trkHeight.Minimum, Math.Min(trkHeight.Maximum, RowHeight)); }
         if (numReserveDigits != null) { numReserveDigits.Value = ReserveDigits; }
         if (rdoLeft != null)
@@ -481,6 +559,8 @@ public class SmwCountersComponentSettings : UserControl
         {
             Hook.UnregisterAllHotkeys();
             if (ResetKey != null) { Hook.RegisterHotKey(ResetKey); }
+            if (IncrementKey != null) { Hook.RegisterHotKey(IncrementKey); }
+            if (DecrementKey != null) { Hook.RegisterHotKey(DecrementKey); }
         }
         catch (Exception ex)
         {
@@ -539,6 +619,9 @@ public class SmwCountersComponentSettings : UserControl
 
         XmlElement rst = e["ResetKey"];
         ResetKey = rst != null && !string.IsNullOrEmpty(rst.InnerText) ? new KeyOrButton(rst.InnerText) : null;
+        IncrementKey = ParseKey(e["IncrementKey"], new KeyOrButton(Keys.PageUp));
+        DecrementKey = ParseKey(e["DecrementKey"], new KeyOrButton(Keys.PageDown));
+        HotkeyTarget = string.IsNullOrEmpty(e["HotkeyTarget"]?.InnerText) ? "oneups" : e["HotkeyTarget"].InnerText;
         RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 45);
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
         ReserveDigits = SettingsHelper.ParseInt(e["ReserveDigits"], ValueWidth.DefaultDigits);
@@ -587,12 +670,23 @@ public class SmwCountersComponentSettings : UserControl
         RefreshFromModel();
     }
 
+    // Absent element = a layout saved before the key existed, so it keeps the
+    // default; present but empty = the user unbound it.
+    private static KeyOrButton ParseKey(XmlElement el, KeyOrButton whenAbsent)
+    {
+        if (el == null) { return whenAbsent; }
+        return string.IsNullOrEmpty(el.InnerText) ? null : new KeyOrButton(el.InnerText);
+    }
+
     public int GetSettingsHashCode() => CreateSettingsNode(null, null);
 
     private int CreateSettingsNode(XmlDocument document, XmlElement parent)
     {
         int hash = SettingsHelper.CreateSetting(document, parent, "Version", "1");
         hash ^= SettingsHelper.CreateSetting(document, parent, "ResetKey", ResetKey);
+        hash ^= SettingsHelper.CreateSetting(document, parent, "IncrementKey", IncrementKey);
+        hash ^= SettingsHelper.CreateSetting(document, parent, "DecrementKey", DecrementKey);
+        hash ^= SettingsHelper.CreateSetting(document, parent, "HotkeyTarget", HotkeyTarget);
         hash ^= SettingsHelper.CreateSetting(document, parent, "RowHeight", RowHeight);
         hash ^= SettingsHelper.CreateSetting(document, parent, "Alignment", Alignment.ToString());
         hash ^= SettingsHelper.CreateSetting(document, parent, "ReserveDigits", ReserveDigits);

@@ -184,6 +184,31 @@ public class SmwCountersComponent : IComponent
     private void Hook_KeyOrButtonPressed(object sender, KeyOrButton e)
     {
         if (e == Settings.ResetKey) { ResetAll(); }
+        else if (e == Settings.IncrementKey) { Adjust(+1); }
+        else if (e == Settings.DecrementKey) { Adjust(-1); }
+    }
+
+    // The hook can fire off the UI thread, and the adjustment touches the
+    // settings' value boxes, so marshal when a handle exists to marshal to.
+    private void Adjust(int delta)
+    {
+        if (Settings.IsHandleCreated && Settings.InvokeRequired)
+        {
+            Settings.BeginInvoke((Action)(() => AdjustOnUiThread(delta)));
+        }
+        else
+        {
+            AdjustOnUiThread(delta);
+        }
+    }
+
+    private void AdjustOnUiThread(int delta)
+    {
+        ISmwCounter c = CounterAdjust.Find(counters, Settings.HotkeyTarget);
+        if (c == null) { return; }
+        CounterAdjust.Apply(c, delta);
+        endedFreeze.Recapture(c);
+        Settings.RefreshValueBoxes();
     }
 
     private void Poll()
