@@ -35,11 +35,8 @@ namespace LiveSplit.SmwCounters.Counters;
 // bounce routine.
 internal sealed class JumpCounter : BankedCounter
 {
-    private const int GameModeOffset    = 0x0100;
     private const int PlayerInAirOffset = 0x0072;
     private const int BlockedDirOffset  = 0x0077;
-
-    private const byte LevelMainMode    = 0x14;
 
     private const byte OnGround     = 0x00;
     private const byte AirRising    = 0x0B;
@@ -62,7 +59,7 @@ internal sealed class JumpCounter : BankedCounter
         // Gate on game mode (level-main), not the legacy $1935 in-level flag:
         // custom Yoshi Houses never set $1935, so jumps there wouldn't count
         // (live-confirmed 2026-07-27). Mirrors PowerupCounter's gate.
-        if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
+        if (!LevelGate.IsLevelMain(memory))
         {
             previousAir.Clear();
             previousBlocked.Clear();

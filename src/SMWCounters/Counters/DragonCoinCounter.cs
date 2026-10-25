@@ -20,9 +20,7 @@ namespace LiveSplit.SmwCounters.Counters;
 internal sealed class DragonCoinCounter : ISmwCounter
 {
     private const int YoshiCoinsOffset = 0x1420;
-    private const int GameModeOffset   = 0x0100;
 
-    private const byte LevelMainMode    = 0x14;
     private const byte CoinsForTheOneUp = 5;
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.dragoncoin.png");
@@ -50,7 +48,7 @@ internal sealed class DragonCoinCounter : ISmwCounter
     public void Poll(ISnesMemory memory)
     {
         if (!memory.IsAttached
-            || !memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode
+            || !LevelGate.IsLevelMain(memory)
             || !memory.ReadWramByte(YoshiCoinsOffset, out byte coins))
         {
             previousCoins.Clear();

@@ -10,8 +10,6 @@ namespace LiveSplit.SmwCounters.Counters;
 // a lifetime tally: it keeps counting across the game's 100-coin 1-up wrap.
 internal sealed class CoinCounter : BankedCounter
 {
-    private const int GameModeOffset = 0x0100;
-    private const byte LevelMainMode = 0x14;
     private const int CoinsOffset = 0x0DBF;
 
     // Largest gain accepted across a 100-wrap in a single ~15ms poll. A wrap
@@ -32,7 +30,7 @@ internal sealed class CoinCounter : BankedCounter
     protected override int DetectCollectDelta(ISnesMemory memory)
     {
         // Gate to in-level so overworld/load/file-select coin writes don't count.
-        if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
+        if (!LevelGate.IsLevelMain(memory))
         {
             previousCoins.Clear();
             return 0;

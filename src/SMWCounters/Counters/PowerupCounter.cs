@@ -9,8 +9,6 @@ namespace LiveSplit.SmwCounters.Counters;
 // completing an exit banks them. total shows in the alert color until banked.
 internal sealed class PowerupCounter : BankedCounter
 {
-    private const int GameModeOffset = 0x0100;
-    private const byte LevelMainMode = 0x14;
     private const int PlayerAnimationOffset = 0x0071;
 
     private static readonly Bitmap icon = IconLoader.Load("LiveSplit.SmwCounters.Assets.mushroom.png");
@@ -26,7 +24,7 @@ internal sealed class PowerupCounter : BankedCounter
     protected override int DetectCollectDelta(ISnesMemory memory)
     {
         // Gate to in-level so overworld/load/garbage animation values don't count.
-        if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
+        if (!LevelGate.IsLevelMain(memory))
         {
             previousCollectAnim.Clear();
             return 0;

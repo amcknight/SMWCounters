@@ -31,8 +31,6 @@ internal enum KillCountMode { Kills, Destruction }
 // carryable state instead of the normal routine (08).
 internal sealed class KillCounter : ISmwCounter, IBankToggleCounter, ITraceSource
 {
-    private const int GameModeOffset = 0x0100;
-    private const byte LevelMainMode = 0x14;
     private const int SlotCount = SpriteSlotTracker.SlotCount;
     private const int CoinCountOffset = 0x0DBF;
     private const byte GoalTapeSprite = 0x7B;
@@ -225,7 +223,7 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter, ITraceSourc
 
     private void ScanSprites(ISnesMemory memory)
     {
-        if (!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode)
+        if (!LevelGate.IsLevelMain(memory))
         {
             ClearAll();
             return;
