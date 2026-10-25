@@ -51,6 +51,9 @@ public class SmwCountersComponentSettings : UserControl
     // whose vertical scrollbar eats ~17px of client width, so anything wider
     // than the host minus that bar sprouts a horizontal scrollbar too.
     private const int DialogWidth = 460;
+    // Left edge of the per-row "Discard on death" checkbox column, right of
+    // the auto-sized Reset button at 96 DPI.
+    private const int BankToggleX = 252;
     public bool ResetOnSplitsReset { get; set; } = true;
     public bool DebugLog { get; set; } = false;
     public bool ShowStatusDot { get; set; } = true;
@@ -106,6 +109,17 @@ public class SmwCountersComponentSettings : UserControl
 
         int y = 10;
 
+        // Column header for the bare per-row checkboxes below; without it the
+        // column reads as empty space (seen 2026-10-25).
+        Controls.Add(new Label
+        {
+            Text = "Discard on death",
+            Location = new Point(BankToggleX - 2, y),
+            AutoSize = true,
+            ForeColor = SystemColors.GrayText,
+        });
+        y += 18;
+
         foreach ((string id, string defaultLabel, bool hasBankToggle, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue, Action refreshExtras) in counters)
         {
             var row = new CounterRow
@@ -160,7 +174,7 @@ public class SmwCountersComponentSettings : UserControl
                 toggleIds.Add(id);
                 row.BankToggle = new CheckBox
                 {
-                    Location = new Point(252, y + 2),
+                    Location = new Point(BankToggleX, y + 2),
                     AutoSize = true,
                     Checked = IsBankOnSave(id),
                 };
@@ -169,6 +183,9 @@ public class SmwCountersComponentSettings : UserControl
                     "Discard on death: unbanked " + defaultLabel + " (shown gold) are discarded if you die " +
                     "before a checkpoint or exit. Both histories are always tracked; this only picks which one is shown.");
                 Controls.Add(row.BankToggle);
+                // Added after the Reset button, so it would sit behind it in
+                // z-order if the two ever overlapped.
+                row.BankToggle.BringToFront();
             }
 
             if (extras != null)
@@ -193,8 +210,8 @@ public class SmwCountersComponentSettings : UserControl
         {
             ReadOnly = true,
             Text = FormatKey(ResetKey),
-            Location = new Point(120, y),
-            Width = 220,
+            Location = new Point(130, y),
+            Width = 210,
         };
         txtReset.Enter += (_, __) => CaptureKey(txtReset, k => ResetKey = k);
         Controls.Add(txtReset);
@@ -210,8 +227,8 @@ public class SmwCountersComponentSettings : UserControl
         {
             ReadOnly = true,
             Text = FormatKey(IncrementKey),
-            Location = new Point(120, y),
-            Width = 220,
+            Location = new Point(130, y),
+            Width = 210,
         };
         txtIncrement.Enter += (_, __) => CaptureKey(txtIncrement, k => IncrementKey = k);
         Controls.Add(txtIncrement);
@@ -227,8 +244,8 @@ public class SmwCountersComponentSettings : UserControl
         {
             ReadOnly = true,
             Text = FormatKey(DecrementKey),
-            Location = new Point(120, y),
-            Width = 220,
+            Location = new Point(130, y),
+            Width = 210,
         };
         txtDecrement.Enter += (_, __) => CaptureKey(txtDecrement, k => DecrementKey = k);
         Controls.Add(txtDecrement);
@@ -247,8 +264,8 @@ public class SmwCountersComponentSettings : UserControl
         cboHotkeyTarget = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(120, y),
-            Width = 220,
+            Location = new Point(130, y),
+            Width = 210,
         };
         Controls.Add(cboHotkeyTarget);
         cboHotkeyTarget.DataSource = targets;
@@ -420,8 +437,45 @@ public class SmwCountersComponentSettings : UserControl
 
         Size = new Size(DialogWidth, y + 10);
 
+        ScaleLayoutToDpi();
+
         RegisterHotKeys();
     }
+
+    // Every position in BuildUi is laid out in 96-DPI pixels, but control
+    // fonts follow the process DPI, so on a 150% display the auto-sized Reset
+    // buttons grew over the bank checkboxes and labels ran into their boxes
+    // (seen 2026-10-25). Scale the finished layout once by the DPI the
+    // process actually sees: 96 in a DPI-unaware host (Windows bitmap-scales
+    // the whole window, nothing to do) and the real value in an aware one.
+    // Control.Scale is not used because it also multiplies the sizes of
+    // text-sized controls whose fonts already grew, which doubled the Reset
+    // button's width. Positions scale for everything; sizes only for
+    // controls whose size is not derived from their text.
+    private void ScaleLayoutToDpi()
+    {
+        float factor;
+        using (Graphics g = Graphics.FromHwnd(IntPtr.Zero)) { factor = g.DpiX / 96f; }
+        if (Math.Abs(factor - 1f) < 0.01f) { return; }
+        ScaleChildren(this, factor);
+        Size = new Size(Scaled(Width, factor), Scaled(Height, factor));
+    }
+
+    // Children only: a container's own size is scaled exactly once, by its
+    // parent's pass (or by ScaleLayoutToDpi for the dialog itself).
+    private static void ScaleChildren(Control parent, float factor)
+    {
+        foreach (Control c in parent.Controls)
+        {
+            c.Location = new Point(Scaled(c.Left, factor), Scaled(c.Top, factor));
+            bool textSized = c.AutoSize && (c is ButtonBase || c is Label);
+            if (!textSized) { c.Size = new Size(Scaled(c.Width, factor), Scaled(c.Height, factor)); }
+            if (c.MaximumSize.Width > 0) { c.MaximumSize = new Size(Scaled(c.MaximumSize.Width, factor), c.MaximumSize.Height); }
+            ScaleChildren(c, factor);   // the Kills radio panel's children
+        }
+    }
+
+    private static int Scaled(int value, float factor) => (int)Math.Round(value * factor);
 
     private void CommitValue(CounterRow row)
     {
