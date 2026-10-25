@@ -135,4 +135,6 @@ public class OneUpCounterTests
       Poll(c, m, Alive, OneUp, NoText); Poll(c, m, Gone, OneUp, Text1Up);
       Assert.Contains(log, l => l.StartsWith("1UP candidate slot0 #78 from=08"));
       Assert.Contains("1UP confirmed slot0 polls=0", log); }
+
+    [Fact] public void HasEmbeddedIcon() => Assert.NotNull(new OneUpCounter().DefaultIcon);
 }

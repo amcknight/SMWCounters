@@ -14,6 +14,7 @@ fan-community speedrunning iconography for their respective counters:
 - `kill.png` &mdash; kills/destruction counter
 - `coin.png` &mdash; coins counter
 - `dragoncoin.png` &mdash; dragon coins counter (Dragon Coin sprite)
+- `oneup.png` &mdash; 1-Ups counter (placeholder copy of the Super Mushroom sprite until the 1-Up Mushroom sprite lands)
 
 ## WRAM discovery
 

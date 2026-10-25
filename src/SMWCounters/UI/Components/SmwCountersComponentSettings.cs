@@ -521,7 +521,10 @@ public class SmwCountersComponentSettings : UserControl
 
     // Moons banking is opt-in (a moon lost to a death revert feels punitive by
     // default); every other toggle counter keeps the established default ON.
-    internal static bool DefaultBankOnSave(string counterId) => counterId != "moons";
+    // A 1-Up mushroom respawns after a death, so re-collecting it would double
+    // count under the plain history; immediate counting is the true-100% view
+    // and the toggle is the low% out.
+    internal static bool DefaultBankOnSave(string counterId) => counterId != "moons" && counterId != "oneups";
 
     public XmlNode GetSettings(XmlDocument document)
     {

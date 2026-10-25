@@ -51,9 +51,10 @@ public class SettingsHashTests
     }
 
     [Fact]
-    public void DefaultBankOnSave_MoonsOff_EverythingElseOn()
+    public void DefaultBankOnSave_MoonsAndOneUpsOff_EverythingElseOn()
     {
         Assert.False(SmwCountersComponentSettings.DefaultBankOnSave("moons"));
+        Assert.False(SmwCountersComponentSettings.DefaultBankOnSave("oneups"));
         Assert.True(SmwCountersComponentSettings.DefaultBankOnSave("kills"));
         Assert.True(SmwCountersComponentSettings.DefaultBankOnSave("jumps"));
         Assert.True(SmwCountersComponentSettings.DefaultBankOnSave("coins"));

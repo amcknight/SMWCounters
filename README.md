@@ -49,11 +49,12 @@ what it has been counting rather than starting from zero.
 | **Powerups** | Mushroom, feather, and flower pickups (the grow animation). | hidden |
 | **Coins** | Coins collected in levels, as a lifetime tally across 100-coin wraps. Shop deductions and off-level coin writes are ignored. | hidden |
 | **Dragon Coins** | Levels in which you collected five Dragon Coins. Ticks the moment the fifth coin is taken (the 1-up) and never again in that level, so a sixth coin adds nothing. | hidden |
+| **1-Ups** | 1-Up mushrooms collected, including the flying golden mushroom and Fishin' Lakitu's bait. Lives from 100 coins, Dragon Coins, moons, bounce chains, and the bonus game do not count. The goal-tape 1-Up does. | hidden |
 | **Kills** | Creatures killed: stomps, spin jumps, shell hits, fireballs, Yoshi eats, lava, goal-tape coins. Objects (throw blocks, springboards, P-switches, message boxes, …) are excluded. A **Destruction** mode counts everything destroyed instead, objects included. | hidden |
 
 ### Discard on death
 
-Moons, Jumps, Powerups, Coins, and Kills are **banked** counters. Collects
+Moons, Jumps, Powerups, Coins, Kills, and 1-Ups are **banked** counters. Collects
 since the last checkpoint or exit show in the layout's gold (best-segment)
 color; reaching a midway, finishing the level, or leaving it any other way
 (start+select, a side exit, a pipe back to the map) banks them; dying first
@@ -72,7 +73,7 @@ through a death, so the count is permanent the moment it ticks.
 Each banked counter has a **Discard on death** checkbox in settings. Both
 histories (with and without discards) are always tracked; the checkbox only
 picks which one is shown, so flipping it mid-run is safe. It defaults on for
-everything except Moons.
+everything except Moons and 1-Ups.
 
 ### What counts, and when
 

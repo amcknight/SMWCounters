@@ -110,6 +110,9 @@
     <EmbeddedResource Include="Assets\dragoncoin.png">
       <LogicalName>LiveSplit.SmwCounters.Assets.dragoncoin.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Assets\oneup.png">
+      <LogicalName>LiveSplit.SmwCounters.Assets.oneup.png</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Assets\kill.png">
       <LogicalName>LiveSplit.SmwCounters.Assets.kill.png</LogicalName>
     </EmbeddedResource>
