@@ -51,9 +51,13 @@ public class SmwCountersComponentSettings : UserControl
     // whose vertical scrollbar eats ~17px of client width, so anything wider
     // than the host minus that bar sprouts a horizontal scrollbar too.
     private const int DialogWidth = 460;
-    // Left edge of the per-row "Discard on death" checkbox column, right of
-    // the auto-sized Reset button at 96 DPI.
+    // Initial left edge of the "Discard on death" checkbox column; the real
+    // position follows the Reset button's width (PlaceAfterReset).
     private const int BankToggleX = 252;
+    private Label lblBankHeader;
+    // 96-DPI-to-current scale applied by ScaleLayoutToDpi (1 when nothing
+    // was scaled), used for gaps computed after that pass.
+    private float dpiFactor = 1f;
     public bool ResetOnSplitsReset { get; set; } = true;
     public bool DebugLog { get; set; } = false;
     public bool ShowStatusDot { get; set; } = true;
@@ -110,14 +114,16 @@ public class SmwCountersComponentSettings : UserControl
         int y = 10;
 
         // Column header for the bare per-row checkboxes below; without it the
-        // column reads as empty space (seen 2026-10-25).
-        Controls.Add(new Label
+        // column reads as empty space (seen 2026-10-25). PlaceAfterReset
+        // lines it up with the column once the rows exist.
+        lblBankHeader = new Label
         {
             Text = "Discard on death",
             Location = new Point(BankToggleX - 2, y),
             AutoSize = true,
             ForeColor = SystemColors.GrayText,
-        });
+        };
+        Controls.Add(lblBankHeader);
         y += 18;
 
         foreach ((string id, string defaultLabel, bool hasBankToggle, Control extras, Action resetValue, Func<int> getValue, Action<int> setValue, Action refreshExtras) in counters)
@@ -194,6 +200,16 @@ public class SmwCountersComponentSettings : UserControl
                 Controls.Add(extras);
                 row.CounterSpecific = extras;
             }
+
+            // The Reset button is auto-sized and grow-only, so its width is
+            // never less than WinForms' 75 px default and grows further with
+            // the host's font (LiveSplit hands this control Segoe UI 9 when
+            // it parents it). Any fixed x for the controls to its right ends
+            // up underneath it — the bank checkbox column was covered that
+            // way until 2026-10-25 — so they follow its actual right edge and
+            // move again whenever it resizes.
+            PlaceAfterReset(row);
+            row.ResetValue.SizeChanged += (_, __) => PlaceAfterReset(row);
 
             SyncRowEnabled(row);
             rows.Add(row);
@@ -438,8 +454,26 @@ public class SmwCountersComponentSettings : UserControl
         Size = new Size(DialogWidth, y + 10);
 
         ScaleLayoutToDpi();
+        foreach (CounterRow row in rows) { PlaceAfterReset(row); }
 
         RegisterHotKeys();
+    }
+
+    // Lays out the row's controls that sit right of the Reset button from the
+    // button's real right edge: the bank checkbox, then the counter-specific
+    // extras (Kills' radios), each separated by a small gap in current
+    // pixels. The header label follows the checkbox column.
+    private void PlaceAfterReset(CounterRow row)
+    {
+        int gap = Scaled(8, dpiFactor);
+        int x = row.ResetValue.Right + gap;
+        if (row.BankToggle != null)
+        {
+            row.BankToggle.Left = x;
+            x = row.BankToggle.Right + gap;
+            if (lblBankHeader != null) { lblBankHeader.Left = row.BankToggle.Left - Scaled(2, dpiFactor); }
+        }
+        if (row.CounterSpecific != null) { row.CounterSpecific.Left = x; }
     }
 
     // Every position in BuildUi is laid out in 96-DPI pixels, but control
@@ -457,6 +491,7 @@ public class SmwCountersComponentSettings : UserControl
         float factor;
         using (Graphics g = Graphics.FromHwnd(IntPtr.Zero)) { factor = g.DpiX / 96f; }
         if (Math.Abs(factor - 1f) < 0.01f) { return; }
+        dpiFactor = factor;
         ScaleChildren(this, factor);
         Size = new Size(Scaled(Width, factor), Scaled(Height, factor));
     }

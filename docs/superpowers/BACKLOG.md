@@ -207,6 +207,14 @@ struck through. Priorities set 2026-09-26.
   fireball hits, galoomba flips, Chuck damage; established 2026-07-14).
   Massive: per-enemy cases. Research path: trace sprite stun timers and
   interaction flags.
+- **Aggressionist run: kill every enemy sprite in the game.** Idea
+  2026-10-25, the inverse of passivism. Only conceivable on top of the
+  sprite identity machinery (Later): "every enemy" means every placed
+  sprite once, across deaths and revisits, which is exactly the
+  (room, `$161A`) identity. Known edge-case mine before any design: red
+  ON/OFF switch boxes, generators and their spawns, Yoshi himself, flying
+  blocks, anything that is a sprite but not an enemy. Gate: the identity
+  machinery shipped and a decision on what "enemy" means.
 - **Tweaker-byte creature filter.** Six per-sprite property bytes
   (`$1656/$1662/$166E/$167A/$1686/$190F`) are dumped on every death/mouth
   entry (`PRP` lines). Unlikely to yield a clean rule; may improve the

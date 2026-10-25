@@ -128,6 +128,11 @@ dotnet build src/SMWCounters/SMWCounters.csproj -c Release
 dotnet test test/SMWCounters.Tests/SMWCounters.Tests.csproj -c Release
 ```
 
+To preview the settings dialog without launching LiveSplit, run
+`pwsh scripts/render-settings.ps1` after a Release build: it renders the
+control at this machine's display scaling with LiveSplit's dialog font and
+dumps every control's bounds, so overlaps show up as numbers.
+
 The built DLL lands under `artifacts/bin/SMWCounters/`. To have every build
 copy it (with `SNES.dll`) straight into your LiveSplit `Components` folder,
 set `ComponentsPath` in a gitignored `SMWCounters.local.props` next to the
