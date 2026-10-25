@@ -501,13 +501,13 @@ public class SmwCountersComponentSettings : UserControl
         using (Graphics g = Graphics.FromHwnd(IntPtr.Zero)) { factor = g.DpiX / 96f; }
         if (Math.Abs(factor - 1f) < 0.01f) { return; }
         dpiFactor = factor;
-        ScaleChildren(this, factor);
+        ScaleChildLayout(this, factor);
         Size = new Size(Scaled(Width, factor), Scaled(Height, factor));
     }
 
     // Children only: a container's own size is scaled exactly once, by its
     // parent's pass (or by ScaleLayoutToDpi for the dialog itself).
-    private static void ScaleChildren(Control parent, float factor)
+    private static void ScaleChildLayout(Control parent, float factor)
     {
         foreach (Control c in parent.Controls)
         {
@@ -515,7 +515,7 @@ public class SmwCountersComponentSettings : UserControl
             bool textSized = c.AutoSize && (c is ButtonBase || c is Label);
             if (!textSized) { c.Size = new Size(Scaled(c.Width, factor), Scaled(c.Height, factor)); }
             if (c.MaximumSize.Width > 0) { c.MaximumSize = new Size(Scaled(c.MaximumSize.Width, factor), c.MaximumSize.Height); }
-            ScaleChildren(c, factor);   // the Kills radio panel's children
+            ScaleChildLayout(c, factor);   // the Kills radio panel's children
         }
     }
 
