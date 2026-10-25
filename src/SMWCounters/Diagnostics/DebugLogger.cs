@@ -11,7 +11,7 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 // (per the "Debug log" setting), each poll appends event lines to a log file:
 //
 //   CTR <id> <old>-><new> [unbanked,hidden] | phase=.. <emu> | mode=.. inLvl=..
-//       anim=.. fanfare=.. io=.. boss=.. exits=.. moon=.. coins=.. ycoin=..
+//       anim=.. fanfare=.. io=.. boss=.. exits=.. moon=.. coins=.. ycoin=.. lives=..
 //                                             (a counter incremented; context is
 //                                              the WRAM the counters key off of.
 //                                              `unbanked` = the value is showing
@@ -37,6 +37,15 @@ namespace LiveSplit.SmwCounters.Diagnostics;
 //                                              status 02-07 — builds the evidence table
 //                                              for a property-based creature filter that
 //                                              could replace the NotAlive ID blacklist)
+//   SCR slot<n> <old>-><new> | mode=..
+//                                             (a score-sprite slot ($16E1..) changed;
+//                                              $0D..$10 are the 1UP family)
+//   LAK slot<n> 151C <old>-><new> | mode=..
+//                                             (a Lakitu's fishing flag changed; the
+//                                              drop to 00 is the bait being taken)
+//   1UP ... / COIN ...
+//                                             (written by the counters themselves via
+//                                              Trace: candidate, confirmed, expired)
 //   SNS state=.. gen=.. base=0x.. method=.. rebind=.. [rivals=..] [contested]
 //       [reg=..] [cooldown] [err=".."] [rom=..] [win=".."] [scanMs=..]
 //                                             (SNES.dll discovery status, logged
@@ -64,6 +73,21 @@ internal sealed class DebugLogger
     private const int MoonByte = 0x13C5;   // moons collected this scene
     private const int CoinCount = 0x0DBF;        // fireball-coin collection correlation
     private const int YoshiCoins = 0x1420;       // dragon coins taken this level
+    // Context only; no counter reads it (the 1-Ups counter confirms on the
+    // score sprite, not on lives) — this trace is how a session shows whether
+    // a hack pins lives.
+    private const int PlayerLives = 0x0DBE;
+
+    // $0D..$10 are the 1UP family the 1-Ups counter confirms on; this trace
+    // lines the signal up against each `1UP candidate` line and catches a
+    // hack that never writes one.
+    private const int ScoreSpriteBase = 0x16E1;
+    private const int ScoreSpriteSlots = 6;
+
+    // Nonzero = fishing (X-position low byte & $10 at init); it drops to zero
+    // when Mario takes the bait — the 1-Ups counter's Lakitu candidate edge.
+    private const int LakituFishingBase = 0x151C;
+    private const byte LakituSprite = 0x1E;
 
     // Everything the bank ("progress is safe now") edge keys off of, traced
     // byte-by-byte so a session can show which signal fired at a checkpoint.
@@ -104,6 +128,8 @@ internal sealed class DebugLogger
     private readonly PreviousByte[] prevStatus;
     private readonly PreviousByte[] prevSpriteNum;
     private readonly PreviousByte[] prevBankSignal;
+    private readonly PreviousByte[] prevScoreSprite;
+    private readonly PreviousByte[] prevLakituFishing;
 
     // Per-translevel overworld flags ($1EA2 + level number): beaten / secret
     // beaten / midway bits. This is the block the game writes to SRAM, so a
@@ -137,6 +163,11 @@ internal sealed class DebugLogger
 
         prevBankSignal = new PreviousByte[BankSignals.Length];
         for (int i = 0; i < BankSignals.Length; i++) { prevBankSignal[i] = new PreviousByte(); }
+
+        prevScoreSprite = new PreviousByte[ScoreSpriteSlots];
+        for (int i = 0; i < ScoreSpriteSlots; i++) { prevScoreSprite[i] = new PreviousByte(); }
+        prevLakituFishing = new PreviousByte[SlotCount];
+        for (int i = 0; i < SlotCount; i++) { prevLakituFishing[i] = new PreviousByte(); }
     }
 
     // Log this poll's counter increments and sprite-status transitions.
@@ -146,7 +177,14 @@ internal sealed class DebugLogger
         LogCounterChanges(mem, counters, isEnabled, phase, emuDesc);
         LogBankSignals(mem);
         LogSpriteTransitions(mem);
+        LogScoreSprites(mem);
+        LogLakituFishing(mem);
     }
+
+    // The sink the component hands to ITraceSource counters so their own
+    // `1UP ...` / `COIN ...` lines (candidate, confirmed, expired) land in the
+    // same file in order.
+    public void Trace(string line) => Write(line);
 
     // Log SNES.dll status transitions ("SNS ..." lines): one line per change
     // of (StateName, Generation, WramBase, IsCoolingDown, LastError, ROM
@@ -177,6 +215,8 @@ internal sealed class DebugLogger
             prevSpriteNum[i].Clear();
         }
         foreach (PreviousByte p in prevBankSignal) { p.Clear(); }
+        foreach (PreviousByte p in prevScoreSprite) { p.Clear(); }
+        foreach (PreviousByte p in prevLakituFishing) { p.Clear(); }
         prevLevelFlags.Clear();
         prevLevelFlagsLevel = -1;
     }
@@ -204,7 +244,8 @@ internal sealed class DebugLogger
                     + $"anim={Hex(mem, PlayerAnim)} fanfare={Hex(mem, Fanfare)} "
                     + $"io={Hex(mem, Io)} boss={Hex(mem, BossDefeat)} "
                     + $"exits={Hex(mem, ExitsSaved)} moon={Hex(mem, MoonByte)} "
-                    + $"coins={Hex(mem, CoinCount)} ycoin={Hex(mem, YoshiCoins)}";
+                    + $"coins={Hex(mem, CoinCount)} ycoin={Hex(mem, YoshiCoins)} "
+                    + $"lives={Hex(mem, PlayerLives)}";
                 Write($"CTR {c.Id} {prev}->{cur}{Tags(c, isEnabled)} | phase={phase} {emuDesc} | {ctx}");
             }
         }
@@ -326,6 +367,41 @@ internal sealed class DebugLogger
             {
                 prevSpriteNum[i].Clear();
             }
+        }
+    }
+
+    private void LogScoreSprites(ISnesMemory mem)
+    {
+        for (int i = 0; i < ScoreSpriteSlots; i++)
+        {
+            if (!mem.ReadWramByte(ScoreSpriteBase + i, out byte value))
+            {
+                prevScoreSprite[i].Clear();
+                continue;
+            }
+            if (prevScoreSprite[i].HasPrevious && prevScoreSprite[i].Value != value)
+            {
+                Write($"SCR slot{i} {prevScoreSprite[i].Value:X2}->{value:X2} | mode={Hex(mem, GameMode)}");
+            }
+            prevScoreSprite[i].Set(value);
+        }
+    }
+
+    private void LogLakituFishing(ISnesMemory mem)
+    {
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (!mem.ReadWramByte(SpriteNumberBase + i, out byte sprite) || sprite != LakituSprite
+                || !mem.ReadWramByte(LakituFishingBase + i, out byte flag))
+            {
+                prevLakituFishing[i].Clear();
+                continue;
+            }
+            if (prevLakituFishing[i].HasPrevious && prevLakituFishing[i].Value != flag)
+            {
+                Write($"LAK slot{i} 151C {prevLakituFishing[i].Value:X2}->{flag:X2} | mode={Hex(mem, GameMode)}");
+            }
+            prevLakituFishing[i].Set(flag);
         }
     }
 

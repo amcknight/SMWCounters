@@ -26,6 +26,7 @@ public class SmwCountersComponent : IComponent
     private readonly Timer pollTimer;
     private readonly SnesConnection connection = new();
     private readonly DebugLogger debugLog = new();
+    private readonly Action<string> traceSink;
     private readonly EndedDisplayFreeze endedFreeze = new();
 
     // Shared "always detached" memory used to flush per-counter edge state
@@ -77,6 +78,7 @@ public class SmwCountersComponent : IComponent
     public SmwCountersComponent(LiveSplitState state)
     {
         this.state = state;
+        traceSink = debugLog.Trace;
 
         // Build the registry of known counters.
         counters = new ISmwCounter[]
@@ -273,6 +275,17 @@ public class SmwCountersComponent : IComponent
             }
         }
         if (bankedChanged) { Settings.RefreshValueBoxes(); }
+
+        // Counters write their own diagnostic lines; the sink is set only
+        // while the debug log is on so a disabled log costs no string formatting.
+        foreach (ISmwCounter c in counters)
+        {
+            if (c is ITraceSource t)
+            {
+                Action<string> want = Settings.DebugLog ? traceSink : null;
+                if (!ReferenceEquals(t.Trace, want)) { t.Trace = want; }
+            }
+        }
 
         if (!counting)
         {
