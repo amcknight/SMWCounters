@@ -18,6 +18,7 @@
 - Production types are `internal`; the test project sees them via `InternalsVisibleTo`. Never widen to `public` for testability.
 - Serialization names are a stable on-disk API: counter id `oneups`, elements `OneUps`/`OneUpsSaved`/`OneUpsPlain` (from `BankedCounter.SaveName = "OneUps"`), settings elements `IncrementKey`, `DecrementKey`, `HotkeyTarget`.
 - Spec values: 1-Up sprites `0x78` and `0x7F`; Lakitu `0x1E` with fishing flag at `$151C + slot`; score sprite table `$16E1`, 6 slots, 1UP family `0x0D..0x10`; candidate status `>= 0x07`; `OneUpCounter.ConfirmWindowPolls = 3`; Kill counter's `CoinKillWindowPolls = 4` stays; `DefaultBankOnSave("oneups") == false`; `HotkeyTarget` default `"oneups"`.
+- Hotkey defaults: `IncrementKey = Keys.PageUp`, `DecrementKey = Keys.PageDown`. Chosen to collide with neither RetroArch's default keyboard hotkeys (F1–F9, F11, F12, numpad plus and minus, Space, Esc, and the letters E F H I K L M N O P R T U Y) nor LiveSplit's (numpad 1–6, 8, 9). RetroArch ignores modifiers, so a Ctrl-combo on a bound key would still collide. In saved settings, an element that is present but empty means the user unbound the key; an absent element means the default.
 - Within one poll the counter reads the score sprite table **before** the sprite slots, so a frame boundary between the two reads can only delay the confirmation, never put it ahead of the candidate.
 - `dotnet build -c Release` copies the DLL to the local LiveSplit Components folder (`SMWCounters.local.props`) and warns MSB3026/MSB3027 if LiveSplit is open; a warning means a stale DLL would be live-tested. Close LiveSplit before Release builds.
 - Windows shell: plain `cd`, never `cd /d`. Trace lines must never throw: a null `Trace` sink is silent.
@@ -246,6 +247,7 @@ git commit -m "refactor: KillCounter composes SpriteSlotTracker and Confirmation
 ### Task 4: `OneUpCounter`
 
 **Files:**
+- Create: `src/SMWCounters/Counters/LevelGate.cs`
 - Create: `src/SMWCounters/Counters/OneUpCounter.cs`
 - Test: `test/SMWCounters.Tests/OneUpCounterTests.cs`
 - Test: `test/SMWCounters.Tests/CounterPersistenceTests.cs` (one test appended)
@@ -254,6 +256,12 @@ git commit -m "refactor: KillCounter composes SpriteSlotTracker and Confirmation
 - Consumes: `BankedCounter`, `MidwayExitBankDetector`, `SpriteSlotTracker`, `ConfirmationWindow`, `ITraceSource`, `IconLoader`.
 - Produces:
   ```csharp
+  // Next to PlayGate, same style: the collect counters' "in a level" gate.
+  internal static class LevelGate
+  {
+      public static bool IsLevelMain(ISnesMemory memory);   // $0100 readable and == 0x14; unreadable = false
+  }
+
   internal sealed class OneUpCounter : BankedCounter, ITraceSource
   {
       public const int ConfirmWindowPolls = 3;
@@ -267,7 +275,7 @@ git commit -m "refactor: KillCounter composes SpriteSlotTracker and Confirmation
   Constants: `GameModeOffset 0x0100`, `LevelMainMode 0x14`, `ScoreSpriteBase 0x16E1`, `ScoreSpriteSlots 6`, `LakituFishingBase 0x151C`, `LoadIndexBase 0x161A`, `RiseTimerBase 0x1540`, `ReserveDropBase 0x1534`, `OneUpMushroom 0x78`, `FlyingGoldenMushroom 0x7F`, `Lakitu 0x1E`, `FirstLifeText 0x0D`, `LastLifeText 0x10`, `MinCandidateStatus 0x07`.
 
   `DetectCollectDelta(ISnesMemory memory)`, in this order:
-  1. Gate: `$0100 != 0x14` → `ClearDetectors()` (clears slots, window, score-sprite previous, Lakitu previous, bank) and return 0.
+  1. Gate: `!LevelGate.IsLevelMain(memory)` → `ClearDetectors()` (clears slots, window, score-sprite previous, Lakitu previous, bank) and return 0.
   2. Read `$16E1..$16E6` into `PreviousByte[6]` tracking: `n` = count of slots with a previous value where current is in `0x0D..0x10` and `current != previous`. Unreadable slot → clear its previous.
   3. `slots.Read(memory)`. For each slot `i`:
      - `!Ok(i)` → `lakituPrev[i].Clear(); window.Disarm(i); continue`.
@@ -442,7 +450,7 @@ Class comment states the rule in one paragraph and cites the spec §3 facts it r
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/SMWCounters/Counters/OneUpCounter.cs test/SMWCounters.Tests/OneUpCounterTests.cs test/SMWCounters.Tests/CounterPersistenceTests.cs
+git add src/SMWCounters/Counters/LevelGate.cs src/SMWCounters/Counters/OneUpCounter.cs test/SMWCounters.Tests/OneUpCounterTests.cs test/SMWCounters.Tests/CounterPersistenceTests.cs
 git commit -m "feat: OneUpCounter — collected 1-Up sprites and Lakitu's bait, confirmed by the 1UP score sprite"
 ```
 
@@ -498,8 +506,8 @@ git commit -m "feat: 1-Ups counter in the component — placeholder icon, discar
   // EndedDisplayFreeze
   public void Recapture(ISmwCounter counter);   // while ended: frozen[counter.Id] = (counter.Value, counter.ValueIsAlert); otherwise no-op
   // Settings
-  public KeyOrButton IncrementKey { get; set; }   // default null
-  public KeyOrButton DecrementKey { get; set; }   // default null
+  public KeyOrButton IncrementKey { get; set; }   // constructor: new KeyOrButton(Keys.PageUp), next to ResetKey = F2
+  public KeyOrButton DecrementKey { get; set; }   // constructor: new KeyOrButton(Keys.PageDown)
   public string HotkeyTarget { get; set; } = "oneups";
   ```
 
@@ -557,7 +565,7 @@ public void Recapture_WhenNotEnded_IsANoOp()
 
 - [ ] **Step 3: Implement `CounterAdjust`, `Recapture`, the settings, and the dispatch**
 
-Settings `BuildUi`, directly after the Reset hotkey row (same geometry: label at `x=10`, control at `x=120` width 220, `y += 30` per row): "Adjust +1 hotkey (global):" text box bound through `CaptureKey(box, k => IncrementKey = k)`; "Adjust −1 hotkey (global):" likewise for `DecrementKey`; "Hotkeys adjust:" `ComboBox` (`DropDownStyle = DropDownList`, items are `(Id, Label)` pairs from the `counters` argument, `DisplayMember = "Label"`, `ValueMember = "Id"`, `SelectedValue = HotkeyTarget`, `SelectedValueChanged` → `HotkeyTarget = (string)SelectedValue`). `RefreshFromModel` updates all three; `RegisterHotKeys` registers both keys when non-null; `SetSettings` parses `IncrementKey`/`DecrementKey` like `ResetKey` and `HotkeyTarget = string.IsNullOrEmpty(e["HotkeyTarget"]?.InnerText) ? "oneups" : e["HotkeyTarget"].InnerText`; `CreateSettingsNode` adds the three `CreateSetting` calls (hash included). Component `Hook_KeyOrButtonPressed`: `else if (e == Settings.IncrementKey) Adjust(+1); else if (e == Settings.DecrementKey) Adjust(-1);` where `Adjust(int delta)` runs on the UI thread (`Settings.IsHandleCreated && Settings.InvokeRequired ? Settings.BeginInvoke(...) : direct`): `var c = CounterAdjust.Find(counters, Settings.HotkeyTarget); if (c == null) return; CounterAdjust.Apply(c, delta); endedFreeze.Recapture(c); Settings.RefreshValueBoxes();`. README Settings list gains: "**Adjust hotkeys** — optional +1 and −1 global keys that nudge one counter, chosen in **Hotkeys adjust** (default 1-Ups), for the rare miscount; they work while paused and after the final split, and a nudge is never discarded by a death."
+Settings `BuildUi`, directly after the Reset hotkey row (same geometry: label at `x=10`, control at `x=120` width 220, `y += 30` per row): "Adjust +1 hotkey (global):" text box bound through `CaptureKey(box, k => IncrementKey = k)`; "Adjust −1 hotkey (global):" likewise for `DecrementKey`; "Hotkeys adjust:" `ComboBox` (`DropDownStyle = DropDownList`, items are `(Id, Label)` pairs from the `counters` argument, `DisplayMember = "Label"`, `ValueMember = "Id"`, `SelectedValue = HotkeyTarget`, `SelectedValueChanged` → `HotkeyTarget = (string)SelectedValue`). `RefreshFromModel` updates all three; `RegisterHotKeys` registers both keys when non-null; `SetSettings` uses a private `static KeyOrButton ParseKey(XmlElement el, KeyOrButton whenAbsent)` — `el == null` → `whenAbsent`; empty `InnerText` → `null` (the user unbound it); otherwise `new KeyOrButton(el.InnerText)` — called as `ParseKey(e["IncrementKey"], new KeyOrButton(Keys.PageUp))` and `ParseKey(e["DecrementKey"], new KeyOrButton(Keys.PageDown))` (`ResetKey` keeps its existing parse), and `HotkeyTarget = string.IsNullOrEmpty(e["HotkeyTarget"]?.InnerText) ? "oneups" : e["HotkeyTarget"].InnerText`; `CreateSettingsNode` adds the three `CreateSetting` calls (hash included). Component `Hook_KeyOrButtonPressed`: `else if (e == Settings.IncrementKey) Adjust(+1); else if (e == Settings.DecrementKey) Adjust(-1);` where `Adjust(int delta)` runs on the UI thread (`Settings.IsHandleCreated && Settings.InvokeRequired ? Settings.BeginInvoke(...) : direct`): `var c = CounterAdjust.Find(counters, Settings.HotkeyTarget); if (c == null) return; CounterAdjust.Apply(c, delta); endedFreeze.Recapture(c); Settings.RefreshValueBoxes();`. README Settings list gains: "**Adjust hotkeys** — +1 and −1 global keys (Page Up and Page Down by default, chosen to stay clear of RetroArch's and LiveSplit's own defaults) that nudge one counter, chosen in **Hotkeys adjust** (default 1-Ups), for the rare miscount; they work while paused and after the final split, and a nudge is never discarded by a death."
 
 - [ ] **Step 4: Run the FULL suite** — expected `Passed: 264` (258 + 4 + 2).
 
@@ -612,8 +620,31 @@ git commit -m "docs: backlog — 1-Ups live pass owed, placeholder icon, sprite-
 
 ---
 
+### Task 9: Cleanup — the six existing collect counters adopt `LevelGate`
+
+**Files:**
+- Modify: `src/SMWCounters/Counters/CoinCounter.cs:35`, `DragonCoinCounter.cs:53`, `JumpCounter.cs:65`, `KillCounter.cs` (`ScanSprites` gate), `MoonCounter.cs:46`, `PowerupCounter.cs:29`
+
+**Interfaces:**
+- Consumes: `LevelGate.IsLevelMain` (Task 4).
+
+- [ ] **Step 1: Replace each `!memory.ReadWramByte(GameModeOffset, out byte gameMode) || gameMode != LevelMainMode` with `!LevelGate.IsLevelMain(memory)`**
+
+Delete each file's `GameModeOffset`/`LevelMainMode` constants when nothing else in the file reads them (`LevelLeaveDetector` and `PlayGate` keep their own — different modes, not this gate). Keep every surrounding comment that explains *why* the gate is level-main (Yoshi's House, `$1935` history); only the read moves.
+
+- [ ] **Step 2: Run the FULL suite** — expected `Passed: 264`, nothing else changed. `grep -rn "gameMode != LevelMainMode" src/` returns nothing.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/SMWCounters/Counters/CoinCounter.cs src/SMWCounters/Counters/DragonCoinCounter.cs src/SMWCounters/Counters/JumpCounter.cs src/SMWCounters/Counters/KillCounter.cs src/SMWCounters/Counters/MoonCounter.cs src/SMWCounters/Counters/PowerupCounter.cs
+git commit -m "refactor: collect counters share LevelGate.IsLevelMain instead of six copies of the mode read"
+```
+
+---
+
 ## Self-review notes
 
-- Spec coverage: §4 rule → Task 4; shared pieces → Tasks 1–3; §5 counter/banking/icon → Tasks 4–5; §6 hotkeys and re-capture → Task 6; §7 log → Tasks 1, 3, 4 (sink + lines) and 7 (logger); §8 → Task 8; §9 → Task 8 entry; §3 facts are cited in `OneUpCounter`'s class comment.
-- Names used consistently: `ConfirmationWindow.{Arm,IsArmed,Disarm,Confirm,Tick,Clear,Trace,WindowPolls}`, `SpriteSlotTracker.{Read,Ok,Status,Sprite,HasPrevious,PreviousStatus,PreviousSprite,Commit,ClearSlot,Clear}`, `ITraceSource.Trace`, `OneUpCounter.ConfirmWindowPolls`, `CounterAdjust.{Find,Apply}`, `EndedDisplayFreeze.Recapture`, settings `IncrementKey`/`DecrementKey`/`HotkeyTarget`, `DebugLogger.Trace`.
+- Spec coverage: §4 rule → Task 4; shared pieces → Tasks 1–3 and 9; §5 counter/banking/icon → Tasks 4–5; §6 hotkeys and re-capture → Task 6; §7 log → Tasks 1, 3, 4 (sink + lines) and 7 (logger); §8 → Task 8; §9 → Task 8 entry; §3 facts are cited in `OneUpCounter`'s class comment. Author's 2026-10-24 notes: hotkey defaults clear of RetroArch/LiveSplit (Global Constraints, Task 6); counter cleanup (Task 9, `LevelGate`).
+- Names used consistently: `ConfirmationWindow.{Arm,IsArmed,Disarm,Confirm,Tick,Clear,Trace,WindowPolls}`, `SpriteSlotTracker.{Read,Ok,Status,Sprite,HasPrevious,PreviousStatus,PreviousSprite,Commit,ClearSlot,Clear}`, `LevelGate.IsLevelMain`, `ITraceSource.Trace`, `OneUpCounter.ConfirmWindowPolls`, `CounterAdjust.{Find,Apply}`, `EndedDisplayFreeze.Recapture`, settings `IncrementKey`/`DecrementKey`/`HotkeyTarget`, `DebugLogger.Trace`.
 - Test counts assume no test is removed; adjust the expected totals if a task adds a `Theory` case.
