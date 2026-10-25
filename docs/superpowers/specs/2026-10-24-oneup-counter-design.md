@@ -208,8 +208,9 @@ Two new global hotkeys alongside the existing Reset hotkey, using the same
 the same gamepad support for free:
 
 - **Increment hotkey** and **Decrement hotkey**, `KeyOrButton`, default
-  **Page Up** and **Page Down**. Registered in `RegisterHotKeys`, dispatched in the
-  component's `Hook_KeyOrButtonPressed` next to the Reset branch.
+  **numpad \*** and **numpad /** (see the dated decisions below). Registered
+  in `RegisterHotKeys`, dispatched in the component's
+  `Hook_KeyOrButtonPressed` next to the Reset branch.
 - **Hotkey target**: a dropdown listing every counter by its label, default
   **1-Ups**. **Decided:** one target at a time, no modifier scheme. The
   dropdown holds counter ids and shows labels, so the serialized value is
@@ -227,13 +228,21 @@ the adjusted counter's own box is refreshed even while it has focus, so its
 stale text cannot later be committed over the nudge (hook callbacks arrive
 off the UI thread; marshal as `CaptureKey` already does).
 
-**Decided 2026-10-24: default-bound keys.** The keys ship bound to Page Up
-and Page Down rather than unbound. Page Up and Page Down collide with
-neither RetroArch's default keyboard hotkeys nor LiveSplit's, and a
-modifier combo is no escape hatch because RetroArch ignores modifiers. The
-accepted trade-off: these are global keys commonly pressed in other
-applications while LiveSplit is open, so a stray press nudges the target
-counter. LiveSplit's own default-bound global Reset (F2) is the precedent.
+**Decided 2026-10-24: default-bound keys.** The keys ship bound rather than
+unbound, to keys that collide with neither RetroArch's default keyboard
+hotkeys nor LiveSplit's; a modifier combo is no escape hatch because
+RetroArch ignores modifiers. The accepted trade-off: a global key pressed
+in another application while LiveSplit is open nudges the target counter.
+The component's own default-bound global Reset is the precedent.
+
+**Decided 2026-10-25: numpad defaults.** The 2026-10-24 choice was Page Up
+and Page Down; the live pass moved all three defaults to the numpad, where
+nothing is typed in a chat window: Reset on numpad `.`, +1 on numpad `*`,
+−1 on numpad `/`. Reset's previous default, F2, is RetroArch's save-state
+key, so a save state taken with LiveSplit open zeroed every counter.
+Numpad `+` and `−` were avoided because RetroArch binds them to volume, and
+numpad 1–6, 8 and 9 because LiveSplit binds them. Defaults only reach
+layouts that never saved a key.
 
 **Call (from the builder check):** in `TimerPhase.Ended` the overlay is
 pinned by `EndedDisplayFreeze` at the final-split values. A hotkey
@@ -244,10 +253,10 @@ behavior; changing it is out of scope.
 
 Persistence: `IncrementKey`, `DecrementKey`, `HotkeyTarget` join the settings
 XML and `GetSettingsHashCode`, so a rebinding dirties the layout
-(verified by review, see §10). Parse rule: an absent key element loads
-the default key (Page Up / Page Down); a present-but-empty element loads as
-unbound (the user cleared it). An absent or empty `HotkeyTarget` loads as
-`"oneups"`.
+(verified by review, see §10). Parse rule, shared by all three keys
+including Reset since 2026-10-25: an absent key element loads the default
+key; a present-but-empty element loads as unbound (the user cleared it). An
+absent or empty `HotkeyTarget` loads as `"oneups"`.
 
 ## 7. Debug log
 

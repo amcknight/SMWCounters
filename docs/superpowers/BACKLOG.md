@@ -85,25 +85,6 @@ struck through. Priorities set 2026-09-26.
   a six-coin level adds nothing; a death after the fifth keeps it; four,
   a death, then five on re-entry counts once; a sublevel pipe mid-tally
   carries the count across. The `BNK ycoin` trace records every pickup.
-- **1-Ups: live pass 2026-10-25 covered most of spec §8; remainder owed.**
-  Verified in one logged session (Scrap Diary): placed, block and
-  invisible-block 1-Ups; the flying golden `$7F`; Fishin' Lakitu (`LAK
-  10->00` in the candidate's own poll); a Yoshi-egg hatch eaten off the
-  tongue, counted once even when the game granted two lives; the goal-tape
-  item 1-Up (counts, by design); a 1-Up scrolling off (`candidate` then
-  `expired`, no count); the goal-tape 3-Up, bounce-chain 1-Ups and the
-  Wiggler 2-Up (texts, no candidates); and the bonus game (five `SCR 0D`
-  texts, no `SPR #78` at all — cluster sprites confirmed). Every
-  confirmation landed at `polls=0`. `lives=` rose during that session, so
-  the hack did not pin lives then and the lives byte was never exercised as
-  a negative. Still owed: the banking set with discard-on-death on (gold
-  until a midway, a death reverts, a collect after the last checkpoint banks
-  on the exit — the path repaired in the 2026-10-24 final review; the
-  checkbox was invisible at 150% DPI until the 2026-10-25 dialog fix), +1/−1
-  after the final split, and the identity capture across a death (re-entry
-  by start+select already showed `idx` stable per placed sprite and
-  `idx=FF rise>0` for block-emitted ones, which is the §9 evidence minus the
-  death).
 - **Screenshot.** The README still carries a TODO for a picture of the
   component in a LiveSplit layout.
 - **Live smoke still owed:** the play gate (a title-screen demo death and a
@@ -117,10 +98,14 @@ struck through. Priorities set 2026-09-26.
   two-component hint is for.
 - **Tag v0.7.0.** Everything after v0.6.0 (2026-09-27): Dragon Coins, 1-Ups
   with the adjust hotkeys, the shared slot tracker and confirmation window,
-  the DPI-scaled settings dialog. csproj is 0.7.0. Pushing the tag runs the
-  release workflow, which stages the `SMWCounters.dll` + `SNES.dll` zip; the
-  release body points at the README for the counter list, so nothing there
-  changes per release.
+  the DPI-scaled settings dialog with its Discard on death column finally
+  visible, numpad hotkey defaults. csproj is 0.7.0. The 1-Ups live pass of
+  2026-10-25 verified every spec §8 case except three, left to their unit
+  tests by decision that day: a collect after the last checkpoint banking on
+  the level exit, the adjust hotkeys after the final split, and a re-collect
+  across a death. Pushing the tag runs the release workflow, which stages
+  the `SMWCounters.dll` + `SNES.dll` zip; the release body points at the
+  README for the counter list, so nothing there changes per release.
 
 ## Next — high
 
@@ -137,12 +122,6 @@ struck through. Priorities set 2026-09-26.
 - **Save/restore counter values after a Reset/close.** Recover the previous
   values, e.g. shown greyed in Settings with a Recover button. Most wanted for
   Deaths and Exits. Gate: design.
-- **Reset hotkey default F2 is RetroArch's save-state key.** Noted 2026-10-25
-  while choosing the adjust-hotkey defaults: RetroArch binds F2 to save state
-  and ignores modifiers, so a save state taken while LiveSplit is open zeroes
-  every counter, and nothing restores them (previous entry). A new default
-  only reaches layouts that never saved a key; Home, Insert and Delete are
-  free in both RetroArch's and LiveSplit's default maps. Gate: decision.
 
 ## Later — medium
 
@@ -162,10 +141,13 @@ struck through. Priorities set 2026-09-26.
   keeps dedupe from fighting death-reverts, which sank the Moons per-level
   dedupe dropped 2026-08-04. Candidates: 1-Ups dedupe (count a placed 1-Up
   once across deaths and revisits), the Yoshi-as-powerup identity sketched by
-  slot above, any future once-per-placed-sprite rule. Gate: one logged session
-  with `$161A`/`$1540`/`$1534` at first sighting and at vanish for a placed
-  1-Up and a block 1-Up, across a death; then a design of its own, scoped to
-  the machinery.
+  slot above, any future once-per-placed-sprite rule, and the aggressionist
+  run (Someday). Evidence from the 2026-10-25 1-Ups live pass: across
+  start+select re-entries a placed 1-Up kept its `idx` (`01`, `00`, `1A`)
+  while block-emitted ones showed `idx=FF` with a nonzero rise timer at first
+  sighting, and vanish-time values were noise during room transitions, so
+  first sighting is the moment to key on. Gate: the same evidence across a
+  death; then a design of its own, scoped to the machinery.
 - **Advanced kill config.** Editable creature filter behind an advanced
   settings surface, with a "last N kills" readout (N≈3) so a player can
   pause, see what just counted, and add it to the exclusion or inclusion

@@ -93,10 +93,11 @@ Open the component's settings (Edit Layout → double-click **SMW Counters**):
   button, and the **Discard on death** checkbox. Kills has a **Kills /
   Destruction** selector.
 - **Reset hotkey** — a global keyboard or gamepad key that zeroes every
-  counter.
-- **Adjust hotkeys** — +1 and −1 global keys (Page Up and Page Down by
-  default, chosen to stay clear of RetroArch's and LiveSplit's own defaults)
-  that nudge one counter, chosen in **Hotkeys adjust** (default 1-Ups), for
+  counter (numpad `.` by default).
+- **Adjust hotkeys** — +1 and −1 global keys (numpad `*` and `/` by default;
+  all three defaults are keys that neither RetroArch nor LiveSplit bind and
+  that nobody types in chat) that nudge one counter, chosen in **Hotkeys
+  adjust** (default 1-Ups), for
   the rare miscount; they work while paused and after the final split, and a
   nudge is never discarded by a death.
 - **Reset counters when splits reset** — on by default.

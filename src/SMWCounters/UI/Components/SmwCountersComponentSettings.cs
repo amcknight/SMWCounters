@@ -62,13 +62,22 @@ public class SmwCountersComponentSettings : UserControl
     public bool DebugLog { get; set; } = false;
     public bool ShowStatusDot { get; set; } = true;
 
+    // Shipped hotkey defaults (decided 2026-10-25): numpad keys that neither
+    // RetroArch (F1–F9, F11, F12, numpad + and −, a dozen letters) nor
+    // LiveSplit (numpad 1–6, 8, 9) bind by default, and that nobody types in
+    // a chat window while LiveSplit's global hook is listening. The previous
+    // Reset default, F2, is RetroArch's save-state key, so a save state
+    // zeroed every counter. Only layouts that never saved a key see these.
+    private static KeyOrButton DefaultResetKey => new KeyOrButton(Keys.Decimal);
+    private static KeyOrButton DefaultIncrementKey => new KeyOrButton(Keys.Multiply);
+    private static KeyOrButton DefaultDecrementKey => new KeyOrButton(Keys.Divide);
+
     public SmwCountersComponentSettings(bool allowGamepads)
     {
         Hook = new CompositeHook(allowGamepads);
-        ResetKey = new KeyOrButton(Keys.F2);
-        // PageUp/PageDown collide with neither RetroArch's nor LiveSplit's default hotkeys.
-        IncrementKey = new KeyOrButton(Keys.PageUp);
-        DecrementKey = new KeyOrButton(Keys.PageDown);
+        ResetKey = DefaultResetKey;
+        IncrementKey = DefaultIncrementKey;
+        DecrementKey = DefaultDecrementKey;
         Size = new Size(420, 240);
     }
 
@@ -719,10 +728,9 @@ public class SmwCountersComponentSettings : UserControl
     {
         var e = (XmlElement)node;
 
-        XmlElement rst = e["ResetKey"];
-        ResetKey = rst != null && !string.IsNullOrEmpty(rst.InnerText) ? new KeyOrButton(rst.InnerText) : null;
-        IncrementKey = ParseKey(e["IncrementKey"], new KeyOrButton(Keys.PageUp));
-        DecrementKey = ParseKey(e["DecrementKey"], new KeyOrButton(Keys.PageDown));
+        ResetKey = ParseKey(e["ResetKey"], DefaultResetKey);
+        IncrementKey = ParseKey(e["IncrementKey"], DefaultIncrementKey);
+        DecrementKey = ParseKey(e["DecrementKey"], DefaultDecrementKey);
         HotkeyTarget = string.IsNullOrEmpty(e["HotkeyTarget"]?.InnerText) ? "oneups" : e["HotkeyTarget"].InnerText;
         RowHeight = SettingsHelper.ParseInt(e["RowHeight"], 45);
         Alignment = Enum.TryParse(e["Alignment"]?.InnerText, out HAlignment align) ? align : HAlignment.Center;
