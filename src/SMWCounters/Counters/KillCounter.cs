@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Xml;
@@ -28,13 +29,11 @@ internal enum KillCountMode { Kills, Destruction }
 // v2 spec): a sprite is "not alive" if its ID is on the observed-offender
 // list, or if it is a koopa ID (04-07, shared by bare shells) dying from a
 // carryable state instead of the normal routine (08).
-internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
+internal sealed class KillCounter : ISmwCounter, IBankToggleCounter, ITraceSource
 {
     private const int GameModeOffset = 0x0100;
     private const byte LevelMainMode = 0x14;
-    private const int SpriteStatusBase = 0x14C8;
-    private const int SpriteNumberBase = 0x009E;
-    private const int SlotCount = 12;
+    private const int SlotCount = SpriteSlotTracker.SlotCount;
     private const int CoinCountOffset = 0x0DBF;
     private const byte GoalTapeSprite = 0x7B;
     private const byte MovingCoinSprite = 0x21;
@@ -66,8 +65,10 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
     // conservative per the design priority).
     private enum MouthEntry : byte { None, Creature, Item }
 
-    private readonly PreviousByte[] prevStatus;
-    private readonly PreviousByte[] prevSprite;
+    // Shared per-poll snapshot of the 12 sprite slots plus their previous
+    // values. All slots are read before any is processed, so a Yoshi in a later
+    // slot can mark a tongue target in an earlier one.
+    private readonly SpriteSlotTracker slots = new();
     private readonly MouthEntry[] mouthEntry = new MouthEntry[SlotCount];
 
     // Set when a creature was fireball-converted to a moving coin in this
@@ -75,11 +76,11 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
     // (tongue grab, slot reuse). Conservative: when unsure, no kill.
     private readonly bool[] pendingCoin = new bool[SlotCount];
 
-    // Polls remaining in which a coin-counter change still proves the pending
-    // coin that despawned from this slot was collected. The despawn edge and
+    // Per-slot windows in which a coin-counter change still proves the pending
+    // coin that despawned from that slot was collected. The despawn edge and
     // the $0DBF change routinely straddle a poll boundary (WRAM reads are not
     // frame-atomic), so requiring same-poll coincidence dropped most kills.
-    private readonly int[] coinWindow = new int[SlotCount];
+    private readonly ConfirmationWindow coinWindow = new(SlotCount, CoinKillWindowPolls, "COIN");
 
     // Polls after a pending coin's despawn during which a coin-counter change
     // still counts as its collection. Covers observed one-poll straddles with
@@ -95,12 +96,6 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
 
     private readonly int[] tongueLinger = new int[SlotCount];
 
-    // Per-poll read buffers: all slots are read before any slot is processed,
-    // so a Yoshi in a later slot can mark a tongue target in an earlier one.
-    private readonly byte[] statusBuf = new byte[SlotCount];
-    private readonly byte[] spriteBuf = new byte[SlotCount];
-    private readonly bool[] okBuf = new bool[SlotCount];
-
     private readonly PreviousByte prevCoins = new();
 
     private int kills;
@@ -113,15 +108,10 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
     private readonly DeathEdgeDetector deathEdge = new();
     private readonly MidwayExitBankDetector bank = new();
 
-    public KillCounter()
+    public Action<string> Trace
     {
-        prevStatus = new PreviousByte[SlotCount];
-        prevSprite = new PreviousByte[SlotCount];
-        for (int i = 0; i < SlotCount; i++)
-        {
-            prevStatus[i] = new PreviousByte();
-            prevSprite[i] = new PreviousByte();
-        }
+        get => coinWindow.Trace;
+        set => coinWindow.Trace = value;
     }
 
     public string Id => "kills";
@@ -228,9 +218,9 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
         {
             mouthEntry[i] = MouthEntry.None;
             pendingCoin[i] = false;
-            coinWindow[i] = 0;
             tongueLinger[i] = 0;
         }
+        coinWindow.Clear();
     }
 
     private void ScanSprites(ISnesMemory memory)
@@ -254,18 +244,14 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
             prevCoins.Clear();
         }
 
-        for (int i = 0; i < SlotCount; i++)
-        {
-            okBuf[i] = memory.ReadWramByte(SpriteStatusBase + i, out statusBuf[i])
-                && memory.ReadWramByte(SpriteNumberBase + i, out spriteBuf[i]);
-        }
+        slots.Read(memory);
 
         // Mark tongue targets before processing despawns: an active Yoshi
         // (sprite #35 in its normal routine — a stale $9E on an empty slot
         // must not poison the linger) naming slot t keeps t's linger warm.
         for (int i = 0; i < SlotCount; i++)
         {
-            if (okBuf[i] && spriteBuf[i] == YoshiSprite && statusBuf[i] == 0x08
+            if (slots.Ok(i) && slots.Sprite(i) == YoshiSprite && slots.Status(i) == 0x08
                 && memory.ReadWramByte(TongueTargetBase + i, out byte target)
                 && target < SlotCount)
             {
@@ -275,35 +261,21 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
 
         for (int i = 0; i < SlotCount; i++)
         {
-            if (!okBuf[i])
+            if (!slots.Ok(i))
             {
                 ClearSlot(i);
                 continue;
             }
-            PollSlot(i, statusBuf[i], spriteBuf[i]);
+            PollSlot(i, slots.Status(i), slots.Sprite(i));
         }
+        slots.Commit();
 
         // Resolve despawned pending coins: one coin-counter change proves one
         // collection (credit the oldest open window only), then age the rest.
-        if (coinsChanged)
-        {
-            int oldest = -1;
-            for (int i = 0; i < SlotCount; i++)
-            {
-                if (coinWindow[i] > 0 && (oldest < 0 || coinWindow[i] < coinWindow[oldest]))
-                {
-                    oldest = i;
-                }
-            }
-            if (oldest >= 0)
-            {
-                AddKill();
-                coinWindow[oldest] = 0;
-            }
-        }
+        if (coinsChanged && coinWindow.Confirm(1) > 0) { AddKill(); }
+        coinWindow.Tick();
         for (int i = 0; i < SlotCount; i++)
         {
-            if (coinWindow[i] > 0) { coinWindow[i]--; }
             if (tongueLinger[i] > 0) { tongueLinger[i]--; }
         }
     }
@@ -313,17 +285,10 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
 
     private void PollSlot(int i, byte status, byte sprite)
     {
-        PreviousByte pStat = prevStatus[i];
-        PreviousByte pSpr = prevSprite[i];
-        if (!pStat.HasPrevious || !pSpr.HasPrevious)
-        {
-            pStat.Set(status);
-            pSpr.Set(sprite);
-            return;
-        }
+        if (!slots.HasPrevious(i)) { return; }
 
-        byte prevStat = pStat.Value;
-        byte prevSpr = pSpr.Value;
+        byte prevStat = slots.PreviousStatus(i);
+        byte prevSpr = slots.PreviousSprite(i);
         bool liveOrigin = prevStat != 0x00 && prevStat != 0x07 && !IsDead(prevStat);
 
         // E6: fireball conversion — the sprite number flips to the moving coin
@@ -348,7 +313,7 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
             if (sprite == MovingCoinSprite && status == 0x00)
             {
                 pendingCoin[i] = false;
-                coinWindow[i] = CoinKillWindowPolls + 1;
+                coinWindow.Arm(i);
             }
             else if (sprite != MovingCoinSprite || status != 0x08)
             {
@@ -406,9 +371,6 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
             }
             tongueLinger[i] = 0;
         }
-
-        pStat.Set(status);
-        pSpr.Set(sprite);
     }
 
     // "Alive" gate for the Kills tally: observed-offender IDs never count, and
@@ -425,17 +387,18 @@ internal sealed class KillCounter : ISmwCounter, IBankToggleCounter
 
     private void ClearSlot(int i)
     {
-        prevStatus[i].Clear();
-        prevSprite[i].Clear();
+        slots.ClearSlot(i);
         mouthEntry[i] = MouthEntry.None;
         pendingCoin[i] = false;
-        coinWindow[i] = 0;
+        coinWindow.Disarm(i);
         tongueLinger[i] = 0;
     }
 
     private void ClearAll()
     {
         for (int i = 0; i < SlotCount; i++) { ClearSlot(i); }
+        coinWindow.Clear();
+        slots.Clear();
         prevCoins.Clear();
     }
 

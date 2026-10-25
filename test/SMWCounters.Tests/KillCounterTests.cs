@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Xml;
 
 using LiveSplit.SmwCounters.Counters;
@@ -761,5 +762,17 @@ public class KillCounterTests
         var b = new KillCounter();            // untouched: everything 0
         Assert.Equal(Kills(a), Kills(b));
         Assert.NotEqual(((ISmwCounter)a).StateHash, ((ISmwCounter)b).StateHash);
+    }
+
+    [Fact]
+    public void CoinWindow_TracesConfirmation()
+    {
+        var c = new KillCounter(); var m = new FakeSnesMemory(); var log = new List<string>();
+        ((ITraceSource)c).Trace = log.Add;
+        PollSlot0Coins(c, m, Alive, Galoomba, coins: 10);
+        PollSlot0Coins(c, m, Alive, MovingCoin, coins: 10);
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 10);
+        PollSlot0Coins(c, m, 0x00, MovingCoin, coins: 11);
+        Assert.Contains("COIN confirmed slot0 polls=1", log);
     }
 }
