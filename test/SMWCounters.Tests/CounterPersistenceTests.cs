@@ -108,4 +108,16 @@ public class CounterPersistenceTests
         c.Banked = false;
         Assert.Equal(3, c.Value);             // plain defaulted to total
     }
+
+    [Fact]
+    public void OneUps_UnbankedTotal_SurvivesRoundTrip()
+    {
+        var c = new OneUpCounter(); var m = new FakeSnesMemory();
+        m.SetByte(0x0100, 0x14); m.SetByte(0x14C8, 0x08); m.SetByte(0x009E, 0x78); m.SetByte(0x16E1, 0x00); c.Poll(m);
+        m.SetByte(0x14C8, 0x00); m.SetByte(0x16E1, 0x0D); c.Poll(m);
+        var restored = new OneUpCounter(); XmlElement el = RoundTrip(c, restored);
+        Assert.NotNull(el["OneUps"]); Assert.NotNull(el["OneUpsSaved"]); Assert.NotNull(el["OneUpsPlain"]);
+        Assert.Equal(1, restored.Value); Assert.True(restored.ValueIsAlert);
+        Assert.Equal(((ISmwCounter)c).StateHash, ((ISmwCounter)restored).StateHash);
+    }
 }
