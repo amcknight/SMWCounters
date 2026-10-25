@@ -5,7 +5,7 @@ logged session (debug log on, then read the trail), or nothing. Entries carry
 the date of the evidence they rest on; resolved entries are deleted, not
 struck through. Priorities set 2026-09-26.
 
-## Now — before tagging v0.6.0
+## Now — before tagging v0.7.0
 
 - **Level-leave rule: shipped on unit tests, needs its live pass.** Seen
   2026-09-26: the hack's intro ends on a "book" orb — Exits collected on the
@@ -85,25 +85,25 @@ struck through. Priorities set 2026-09-26.
   a six-coin level adds nothing; a death after the fifth keeps it; four,
   a death, then five on re-entry counts once; a sublevel pipe mid-tally
   carries the count across. The `BNK ycoin` trace records every pickup.
-- **1-Ups: shipped on unit tests 2026-10-24, live pass owed.** Counts a
-  `$78`/`$7F` sprite vanishing, or Lakitu's `$151C` fishing flag dropping,
-  when a 1UP-family score sprite in `$16E1` confirms it within 3 polls;
-  banked, with discard-on-death off by default like Moons. Debug log on, one
-  session. First check: a `SCR` 1UP-family entry appears on the first collect
-  (Scrap Diary pins lives at 99, so `lives=` is expected flat and proves
-  nothing either way). Then, in this order where the hack allows: a placed
-  1-Up; a block 1-Up; a flying golden 1-Up (Scrap Diary); Fishin' Lakitu in
-  Forest of Illusion 4 (author knows where to test); Yoshi's tongue on a
-  1-Up, then a swallow; a goal-tape 1-Up (expected to count); the bonus game
-  (expected not to count, with no `SPR` `$78` line at all; the 2026-10-24
-  design doubts the cluster-sprite claim, so this is a named check); 100
-  coins, a fifth Dragon Coin, a moon, and a bounce chain (none count); a
-  1-Up left to scroll off (no count); collect, die, re-collect with discard
-  off (counts twice) and with discard on (once, gold until banked); +1/−1
-  hotkeys while paused, while running, and after the final split. Read the
-  `1UP … polls=` lines to confirm the 3-poll window and the `SPR` trace
-  for any `$78` vanish that produced no candidate; the `CTR` context carries
-  `lives=`.
+- **1-Ups: live pass 2026-10-25 covered most of spec §8; remainder owed.**
+  Verified in one logged session (Scrap Diary): placed, block and
+  invisible-block 1-Ups; the flying golden `$7F`; Fishin' Lakitu (`LAK
+  10->00` in the candidate's own poll); a Yoshi-egg hatch eaten off the
+  tongue, counted once even when the game granted two lives; the goal-tape
+  item 1-Up (counts, by design); a 1-Up scrolling off (`candidate` then
+  `expired`, no count); the goal-tape 3-Up, bounce-chain 1-Ups and the
+  Wiggler 2-Up (texts, no candidates); and the bonus game (five `SCR 0D`
+  texts, no `SPR #78` at all — cluster sprites confirmed). Every
+  confirmation landed at `polls=0`. `lives=` rose during that session, so
+  the hack did not pin lives then and the lives byte was never exercised as
+  a negative. Still owed: the banking set with discard-on-death on (gold
+  until a midway, a death reverts, a collect after the last checkpoint banks
+  on the exit — the path repaired in the 2026-10-24 final review; the
+  checkbox was invisible at 150% DPI until the 2026-10-25 dialog fix), +1/−1
+  after the final split, and the identity capture across a death (re-entry
+  by start+select already showed `idx` stable per placed sprite and
+  `idx=FF rise>0` for block-emitted ones, which is the §9 evidence minus the
+  death).
 - **Screenshot.** The README still carries a TODO for a picture of the
   component in a LiveSplit layout.
 - **Live smoke still owed:** the play gate (a title-screen demo death and a
@@ -115,9 +115,12 @@ struck through. Priorities set 2026-09-26.
   digit count. Needs another look in a real layout. Eight counters at row
   height 45 won't fit a default-width LiveSplit window; that's what the
   two-component hint is for.
-- **Tag v0.6.0.** csproj is 0.6.0 and the README matches. Pushing the tag
-  runs the release workflow, which stages the `SMWCounters.dll` + `SNES.dll`
-  zip.
+- **Tag v0.7.0.** Everything after v0.6.0 (2026-09-27): Dragon Coins, 1-Ups
+  with the adjust hotkeys, the shared slot tracker and confirmation window,
+  the DPI-scaled settings dialog. csproj is 0.7.0. Pushing the tag runs the
+  release workflow, which stages the `SMWCounters.dll` + `SNES.dll` zip; the
+  release body points at the README for the counter list, so nothing there
+  changes per release.
 
 ## Next — high
 
@@ -134,6 +137,12 @@ struck through. Priorities set 2026-09-26.
 - **Save/restore counter values after a Reset/close.** Recover the previous
   values, e.g. shown greyed in Settings with a Recover button. Most wanted for
   Deaths and Exits. Gate: design.
+- **Reset hotkey default F2 is RetroArch's save-state key.** Noted 2026-10-25
+  while choosing the adjust-hotkey defaults: RetroArch binds F2 to save state
+  and ignores modifiers, so a save state taken while LiveSplit is open zeroes
+  every counter, and nothing restores them (previous entry). A new default
+  only reaches layouts that never saved a key; Home, Insert and Delete are
+  free in both RetroArch's and LiveSplit's default maps. Gate: decision.
 
 ## Later — medium
 
@@ -183,7 +192,10 @@ struck through. Priorities set 2026-09-26.
   (the score-sprite timer) would disambiguate if the live pass ever shows it.
 - **Verification wanted (one session each):** does `$0DD5` shift on sublevel
   pipe/door transitions (would bank early)? Destruction tally spot-check
-  (shipped on unit tests). Kills-row radios at 125%/150% DPI.
+  (shipped on unit tests). The settings dialog at 150% inside LiveSplit
+  after the 2026-10-25 layout scaling (Kills radios, trackbar, wrapped
+  labels; the offscreen render that validated the fix cannot paint text
+  boxes).
 
 ## Someday — low
 
