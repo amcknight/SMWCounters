@@ -1,5 +1,7 @@
 # 1-Ups Counter Implementation Plan
 
+> **Note (2026-10-25):** the hotkey defaults in Task 6's steps (Page Up / Page Down, Reset on F2) were superseded by numpad `.`, `*`, `/`; spec §6 records why. Global Constraints below carries the shipped values.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A banked "1-Ups" counter that counts collected 1-Up mushroom sprites (`$78`, `$7F`) and Fishin' Lakitu's bait, confirmed by the game's own 1UP score sprite within 3 polls, plus +1/−1 global hotkeys that adjust one chosen counter.
@@ -18,7 +20,7 @@
 - Production types are `internal`; the test project sees them via `InternalsVisibleTo`. Never widen to `public` for testability.
 - Serialization names are a stable on-disk API: counter id `oneups`, elements `OneUps`/`OneUpsSaved`/`OneUpsPlain` (from `BankedCounter.SaveName = "OneUps"`), settings elements `IncrementKey`, `DecrementKey`, `HotkeyTarget`.
 - Spec values: 1-Up sprites `0x78` and `0x7F`; Lakitu `0x1E` with fishing flag at `$151C + slot`; score sprite table `$16E1`, 6 slots, 1UP family `0x0D..0x10`; candidate status `>= 0x07`; `OneUpCounter.ConfirmWindowPolls = 3`; Kill counter's `CoinKillWindowPolls = 4` stays; `DefaultBankOnSave("oneups") == false`; `HotkeyTarget` default `"oneups"`.
-- Hotkey defaults: `IncrementKey = Keys.PageUp`, `DecrementKey = Keys.PageDown`. Chosen to collide with neither RetroArch's default keyboard hotkeys (F1–F9, F11, F12, numpad plus and minus, Space, Esc, and the letters E F H I K L M N O P R T U Y) nor LiveSplit's (numpad 1–6, 8, 9). RetroArch ignores modifiers, so a Ctrl-combo on a bound key would still collide. In saved settings, an element that is present but empty means the user unbound the key; an absent element means the default.
+- Hotkey defaults (as shipped; this plan's original `Keys.PageUp`/`Keys.PageDown` were superseded 2026-10-25 by the numpad decision in spec §6): `ResetKey = Keys.Decimal` (numpad `.`), `IncrementKey = Keys.Multiply` (numpad `*`), `DecrementKey = Keys.Divide` (numpad `/`). Chosen to collide with neither RetroArch's default keyboard hotkeys (F1–F9, F11, F12, numpad plus and minus, Space, Esc, and the letters E F H I K L M N O P R T U Y) nor LiveSplit's (numpad 1–6, 8, 9). RetroArch ignores modifiers, so a Ctrl-combo on a bound key would still collide. In saved settings, an element that is present but empty means the user unbound the key; an absent element means the default.
 - Within one poll the counter reads the score sprite table **before** the sprite slots, so a frame boundary between the two reads can only delay the confirmation, never put it ahead of the candidate.
 - `dotnet build -c Release` copies the DLL to the local LiveSplit Components folder (`SMWCounters.local.props`) and warns MSB3026/MSB3027 if LiveSplit is open; a warning means a stale DLL would be live-tested. Close LiveSplit before Release builds.
 - Windows shell: plain `cd`, never `cd /d`. Trace lines must never throw: a null `Trace` sink is silent.

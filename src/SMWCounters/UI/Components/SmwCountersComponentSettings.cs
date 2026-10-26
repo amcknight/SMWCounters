@@ -51,9 +51,9 @@ public class SmwCountersComponentSettings : UserControl
     // whose vertical scrollbar eats ~17px of client width, so anything wider
     // than the host minus that bar sprouts a horizontal scrollbar too.
     private const int DialogWidth = 460;
-    // Initial left edge of the "Discard on death" checkbox column; the real
-    // position follows the Reset button's width (PlaceAfterReset).
-    private const int BankToggleX = 252;
+    // Left edge and width of the hotkey text boxes and the target dropdown.
+    private const int HotkeyFieldX = 130;
+    private const int HotkeyFieldWidth = 210;
     private Label lblBankHeader;
     // 96-DPI-to-current scale applied by ScaleLayoutToDpi (1 when nothing
     // was scaled), used for gaps computed after that pass.
@@ -123,12 +123,12 @@ public class SmwCountersComponentSettings : UserControl
         int y = 10;
 
         // Column header for the bare per-row checkboxes below; without it the
-        // column reads as empty space (seen 2026-10-25). PlaceAfterReset
-        // lines it up with the column once the rows exist.
+        // column reads as empty space (seen 2026-10-25). PlaceBankHeader
+        // sets its x once the rows exist.
         lblBankHeader = new Label
         {
             Text = "Discard on death",
-            Location = new Point(BankToggleX - 2, y),
+            Location = new Point(0, y),
             AutoSize = true,
             ForeColor = SystemColors.GrayText,
         };
@@ -189,7 +189,7 @@ public class SmwCountersComponentSettings : UserControl
                 toggleIds.Add(id);
                 row.BankToggle = new CheckBox
                 {
-                    Location = new Point(BankToggleX, y + 2),
+                    Location = new Point(0, y + 2),   // x from PlaceAfterReset
                     AutoSize = true,
                     Checked = IsBankOnSave(id),
                 };
@@ -205,7 +205,7 @@ public class SmwCountersComponentSettings : UserControl
 
             if (extras != null)
             {
-                extras.Location = new Point(275, y);
+                extras.Location = new Point(0, y);   // x from PlaceAfterReset
                 Controls.Add(extras);
                 row.CounterSpecific = extras;
             }
@@ -217,8 +217,7 @@ public class SmwCountersComponentSettings : UserControl
             // up underneath it — the bank checkbox column was covered that
             // way until 2026-10-25 — so they follow its actual right edge and
             // move again whenever it resizes.
-            PlaceAfterReset(row);
-            row.ResetValue.SizeChanged += (_, __) => PlaceAfterReset(row);
+            row.ResetValue.SizeChanged += (_, __) => { PlaceAfterReset(row); PlaceBankHeader(); };
 
             SyncRowEnabled(row);
             rows.Add(row);
@@ -235,8 +234,8 @@ public class SmwCountersComponentSettings : UserControl
         {
             ReadOnly = true,
             Text = FormatKey(ResetKey),
-            Location = new Point(130, y),
-            Width = 210,
+            Location = new Point(HotkeyFieldX, y),
+            Width = HotkeyFieldWidth,
         };
         txtReset.Enter += (_, __) => CaptureKey(txtReset, k => ResetKey = k);
         Controls.Add(txtReset);
@@ -252,8 +251,8 @@ public class SmwCountersComponentSettings : UserControl
         {
             ReadOnly = true,
             Text = FormatKey(IncrementKey),
-            Location = new Point(130, y),
-            Width = 210,
+            Location = new Point(HotkeyFieldX, y),
+            Width = HotkeyFieldWidth,
         };
         txtIncrement.Enter += (_, __) => CaptureKey(txtIncrement, k => IncrementKey = k);
         Controls.Add(txtIncrement);
@@ -269,8 +268,8 @@ public class SmwCountersComponentSettings : UserControl
         {
             ReadOnly = true,
             Text = FormatKey(DecrementKey),
-            Location = new Point(130, y),
-            Width = 210,
+            Location = new Point(HotkeyFieldX, y),
+            Width = HotkeyFieldWidth,
         };
         txtDecrement.Enter += (_, __) => CaptureKey(txtDecrement, k => DecrementKey = k);
         Controls.Add(txtDecrement);
@@ -289,8 +288,8 @@ public class SmwCountersComponentSettings : UserControl
         cboHotkeyTarget = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(130, y),
-            Width = 210,
+            Location = new Point(HotkeyFieldX, y),
+            Width = HotkeyFieldWidth,
         };
         Controls.Add(cboHotkeyTarget);
         cboHotkeyTarget.DataSource = targets;
@@ -463,7 +462,10 @@ public class SmwCountersComponentSettings : UserControl
         Size = new Size(DialogWidth, y + 10);
 
         ScaleLayoutToDpi();
+        // The authoritative placement, after scaling; the SizeChanged
+        // handlers above follow later re-measures (the host's font).
         foreach (CounterRow row in rows) { PlaceAfterReset(row); }
+        PlaceBankHeader();
 
         RegisterHotKeys();
     }
@@ -471,7 +473,7 @@ public class SmwCountersComponentSettings : UserControl
     // Lays out the row's controls that sit right of the Reset button from the
     // button's real right edge: the bank checkbox, then the counter-specific
     // extras (Kills' radios), each separated by a small gap in current
-    // pixels. The header label follows the checkbox column.
+    // pixels.
     private void PlaceAfterReset(CounterRow row)
     {
         int gap = Scaled(8, dpiFactor);
@@ -480,9 +482,16 @@ public class SmwCountersComponentSettings : UserControl
         {
             row.BankToggle.Left = x;
             x = row.BankToggle.Right + gap;
-            if (lblBankHeader != null) { lblBankHeader.Left = row.BankToggle.Left - Scaled(2, dpiFactor); }
         }
         if (row.CounterSpecific != null) { row.CounterSpecific.Left = x; }
+    }
+
+    // The column header sits over the checkbox column, so it follows the
+    // first row that has a checkbox.
+    private void PlaceBankHeader()
+    {
+        CheckBox first = rows.Find(r => r.BankToggle != null)?.BankToggle;
+        if (lblBankHeader != null && first != null) { lblBankHeader.Left = first.Left - Scaled(2, dpiFactor); }
     }
 
     // Every position in BuildUi is laid out in 96-DPI pixels, but control

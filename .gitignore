@@ -26,3 +26,6 @@ Thumbs.db
 
 # superpowers SDD scratch (ledgers, briefs, review packages)
 .superpowers/
+
+# Output of scripts/render-settings.ps1
+scripts/settings-render.png
